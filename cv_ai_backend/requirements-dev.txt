@@ -1,0 +1,11 @@
+# Development Dependencies
+-r requirements.txt
+
+# Enhanced Development Tools
+coverage==7.6.4                    # Enhanced coverage
+ipython==8.29.0                    # Enhanced REPL
+rich==13.9.4                       # Beautiful terminal output
+watchdog==4.0.2                    # File watching for development
+
+# API Development
+httpie==3.2.3                      # API testing tool
