@@ -1,0 +1,129 @@
+{
+  "name": "Aldo Hernández Villanueva",
+  "contact": {
+    "location": "Monterrey, Nuevo León, México",
+    "phone": "+52 818-256-0965",
+    "email": "aldohernandez97@hotmail.com",
+    "linkedin": "https://linkedin.com/in/aldo-hernandez",
+    "tableauPublic": "https://public.tableau.com/app/profile/aldo.henandez/vizzes",
+    "birthdate":"08-08-1997"
+  },
+  "summary": "Economics graduate with 2+ years of hands-on experience in data analysis, social listening, and AI-driven reporting. Skilled at automating data pipelines, synthesizing KPIs, and translating insights into actionable strategies for stakeholders.",
+  "coreCompetences": {
+    "technicalSkills": [
+      "Python (pandas, requests, web scraping)",
+      "SQL & Relational Databases",
+      "FastAPI & REST API Development",
+      "LangChain & RAG Pipelines",
+      "LLMs Developer - OpenAI",
+      "Next.js & Static Site Generation",
+      "Tableau (Dashboards & Visualizations)",
+      "Power BI (Report Automation)",
+      "Git & Version Control",
+      "Data Pipeline Automation",
+      "Microsoft Package"
+    ],
+    "analyticalSkills": [
+      "Social Media KPI Modeling",
+      "Sentiment Analysis",
+      "Statistical Analysis",
+      "Continuous Process Improvement",
+      "A/B Testing"
+    ],
+    "interpersonalSkills": [
+      "Cross-campus Stakeholder Engagement",
+      "Presentation & Reporting",
+      "Team Mentoring & Collaboration",
+      "English Communication"
+    ]
+  },
+  "professionalExperience": [
+    {
+      "role": "Social Listening & Insights Analyst",
+      "company": "Swarm Data and People",
+      "startDate": "2025-01",
+      "endDate": "Present",
+      "bullets": [
+        "Lead monthly social-listening performance analysis for 10+ Tec de Monterrey campuses, synthesizing reach, engagement, and sentiment metrics",
+        "Automated data-ingestion pipelines using Python and SQL, reducing report preparation time by 50%",
+        "Partner with campus directors to translate insights into actionable content strategies and deliver stakeholder presentations"
+      ]
+    },
+    {
+      "role": "Content Creator — Communication",
+      "company": "Self-employed",
+      "startDate": "2022-04",
+      "endDate": "2024-08",
+      "bullets": [
+        "Built and managed an online community to enhance brand communication and follower engagement",
+        "Analyzed demographic metrics and audience profiles to tailor content strategy",
+        "Monitored Google Trends and Social Blade for topic identification and real-time trend integration"
+      ]
+    },
+    {
+      "role": "Data Analyst",
+      "company": "Wii México",
+      "startDate": "2021-01",
+      "endDate": "2022-03",
+      "bullets": [
+        "Managed and consolidated transactions from all service providers into unified weekly and monthly reports",
+        "Investigated data discrepancies, identified root causes, and recommended corrective actions to improve accuracy",
+        "Created Tableau dashboards to visualize service-provider usage and inform resource allocation decisions"
+      ]
+    },
+    {
+      "role": "Research Assistant",
+      "company": "ITESM / CIEP Research",
+      "startDate": "2019-06",
+      "endDate": "2019-12",
+      "bullets": [
+        "Assisted in developing a bulletin analyzing mental health expenditure within the Federal Expenditure Budget (PPEF 2020)",
+        "Conducted SQL and Excel–based analyses to assess trends in public expenditure",
+        "Collaborated with senior researchers to draft findings and visual summaries"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "title": "Business Growth Analysis",
+      "technology": "Tableau, SQL",
+      "description": "Interactive dashboard tracking business density and growth trends across municipalities in Nuevo León.",
+      "bullets": [
+        "Performed SQL data extraction and cleaning to calculate regional business density",
+        "Developed Tableau visualizations highlighting sector-specific growth patterns for strategic planning"
+      ]
+    },
+    {
+      "title": "NFL Betting Index",
+      "technology": "Python",
+      "description": "Custom index aggregation of NFL betting site data for trend analysis.",
+      "bullets": [
+        "Wrote Python scripts to scrape and merge betting odds datasets",
+        "Transformed raw data into actionable insights on betting patterns over seasons"
+      ]
+    },
+    {
+      "title": "AI-Driven CV Query System",
+      "technology": "Next.js, FastAPI, OpenAI",
+      "description": "Intelligent CV query system with AI-powered natural language processing that enables real-time questioning about professional experience, skills, and background with advanced caching and performance monitoring.",
+      "bullets": [
+        "Built FastAPI backend with OpenAI integration for natural language CV querying",
+        "Implemented intelligent caching system achieving sub-second response times for repeated queries",
+        "Developed comprehensive monitoring and statistics tracking for query performance and confidence scoring"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "B.A. in Economics",
+      "institution": "Tecnológico de Monterrey",
+      "startYear": 2015,
+      "endYear": 2021,
+      "notes": "Academic projects using Python and R for statistical analysis"
+    }
+  ],
+  "certifications": [
+    "LLM Engineering: Master AI, Large Language Models & Agents (2025)",
+    "Power BI Certified Analyst (LinkedIn Learning)"
+  ]
+}
