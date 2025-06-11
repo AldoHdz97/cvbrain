@@ -107,120 +107,47 @@ class UltimateBaseModel(BaseModel):
     )
 
 class UltimateQueryRequest(UltimateBaseModel):
-    """
-    SIMPLIFIED Query Request - Just Ask Questions!
+    """SIMPLIFIED Query Request with required request_id"""
     
-    ChromaDB and the backend handle all the complexity.
-    Frontend just sends questions, gets answers.
-    """
-    
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "question": "What are your main technical skills?"
-            }
-        }
-    )
-    
-    # ONLY question is required - everything else is optional!
     question: Annotated[str, StringConstraints(
         min_length=3,
         max_length=2000,
         strip_whitespace=True
-    )] = Field(
-        ...,
-        description="Natural language question about Aldo's professional background",
-        examples=[
-            "What are your main technical skills?",
-            "Tell me about your work experience",
-            "What projects have you built?",
-            "Describe your educational background",
-            "What are your achievements?"
-        ]
+    )] = Field(..., description="Question about Aldo's professional background")
+    
+    # Add back request_id - backend service needs this
+    request_id: str = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Request identifier"
     )
     
-    # Everything else is OPTIONAL with smart defaults
-    k: Optional[Annotated[int, Field(ge=1, le=10)]] = Field(
-        default=3,
-        description="Number of relevant document chunks (backend decides)"
-    )
-    
-    query_type: Optional[QueryType] = Field(
-        default=None,
-        description="Query type (auto-detected by backend)"
-    )
-    
-    response_format: Optional[ResponseFormat] = Field(
-        default=ResponseFormat.DETAILED,
-        description="Response format (backend chooses)"
-    )
-    
-    include_sources: Optional[bool] = Field(
-        default=True,
-        description="Include sources (backend decision)"
-    )
-    
-    include_confidence_explanation: Optional[bool] = Field(
-        default=False,
-        description="Include confidence explanation (backend decision)"
-    )
-    
-    language: Optional[Annotated[str, StringConstraints(
-        pattern=r"^[a-z]{2}(?:-[A-Z]{2})?$"
-    )]] = Field(
-        default="en",
-        description="Response language (backend detects/defaults)"
-    )
-    
-    max_response_length: Optional[Annotated[int, Field(ge=100, le=2000)]] = Field(
-        default=800,
-        description="Maximum response length (backend manages)"
-    )
+    # Optional fields with defaults
+    k: Optional[int] = Field(default=3)
+    query_type: Optional[QueryType] = Field(default=None)
+    response_format: Optional[ResponseFormat] = Field(default=ResponseFormat.DETAILED)
+    include_sources: Optional[bool] = Field(default=True)
+    include_confidence_explanation: Optional[bool] = Field(default=False)
+    language: Optional[str] = Field(default="en")
+    max_response_length: Optional[int] = Field(default=800)
     
     @field_validator("question")
     @classmethod
     def validate_question_security(cls, v: str, info: ValidationInfo) -> str:
-        """
-        SIMPLIFIED security validation - just the essentials
-        """
-        # Normalize whitespace
         v = re.sub(r'\s+', ' ', v.strip())
-        
-        # Basic security check - simplified patterns
-        security_patterns = [
-            'ignore previous instructions',
-            'system:',
-            'assistant:', 
-            'jailbreak',
-            'override instructions'
-        ]
-        
-        for pattern in security_patterns:
-            if pattern in v.lower():
-                raise ValueError(
-                    "Question contains unsafe content"
-                )
-        
-        # Basic validation
         words = v.split()
         if len(words) < 2:
             raise ValueError("Question must contain at least 2 meaningful words")
-        
         return v
     
     @computed_field
     @property
     def question_hash(self) -> str:
-        """Simple cache key"""
-        import hashlib
         return hashlib.md5(self.question.encode()).hexdigest()[:16]
     
     @computed_field  
     @property
     def complexity(self) -> QueryComplexity:
-        """Simple complexity assessment"""
         word_count = len(self.question.split())
-        
         if word_count <= 5:
             return QueryComplexity.SIMPLE
         elif word_count <= 15:
