@@ -15,13 +15,13 @@ from app.models.schemas import (
     UltimateQueryRequest, UltimateQueryResponse, QueryType, 
     ConfidenceLevel, ResponseFormat, QueryComplexity
 
-from app.utils.github_embeddings_downloader import ensure_embeddings_available
-
 )
 from app.utils.connection_manager import UltimateConnectionManager
 from app.utils.caching_system import UltimateCacheSystem, CacheBackend
 from app.utils.chromadb_manager import UltimateChromaDBManager
 from app.utils.rate_limiter import UltimateRateLimiter
+
+from app.utils.github_embeddings_downloader import ensure_embeddings_available
 
 logger = logging.getLogger(__name__)
 
