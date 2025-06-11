@@ -9,10 +9,14 @@ import time
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 
+
 from app.core.config import get_settings
 from app.models.schemas import (
     UltimateQueryRequest, UltimateQueryResponse, QueryType, 
     ConfidenceLevel, ResponseFormat, QueryComplexity
+
+from app.utils.github_embeddings_downloader import ensure_embeddings_available
+
 )
 from app.utils.connection_manager import UltimateConnectionManager
 from app.utils.caching_system import UltimateCacheSystem, CacheBackend
@@ -70,6 +74,14 @@ class UltimateCVService:
         """Initialize all service components"""
         try:
             logger.info("🚀 Initializing Ultimate CV Service...")
+
+            logger.info("🔍 Checking embeddings availability...")
+            embeddings_ready = await ensure_embeddings_available(self.settings)
+
+            # Ensure embeddings are available 
+            if not embeddings_ready:
+                logger.error("❌ Failed to ensure embeddings availability")
+                logger.warning("⚠️ Continuing without verified embeddings...")
 
             # Initialize cache system
             cache_success = await self.cache_system.initialize()
