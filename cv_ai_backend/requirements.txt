@@ -14,7 +14,7 @@ pydantic-settings==2.6.1           # Enhanced settings management
 # ============================================================================
 openai==1.55.3                     # Latest with improved async support & streaming
 chromadb==1.0.11                   # Stable production release with persistence
-httpx==0.28.0                      # Async HTTP client with HTTP/2 support
+httpx[http2]==0.28.0                      # Async HTTP client with HTTP/2 support
 
 # ============================================================================
 # Core Dependencies (Memory & Performance Optimized)
