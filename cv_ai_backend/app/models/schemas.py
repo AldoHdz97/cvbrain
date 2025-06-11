@@ -94,67 +94,23 @@ class QueryComplexity(str, Enum):
     COMPLEX = "complex"        # 16-30 words
     VERY_COMPLEX = "very_complex"  # >30 words
 
-class UltimateBaseModel(BaseModel):
-    """
-    Ultimate base model with latest Pydantic v2 optimizations
-
-    FEATURES:
-    - Performance-optimized configuration
-    - Memory-efficient validation
-    - Enhanced JSON serialization
-    - Consistent validation across all models
-    """
-
-    model_config = ConfigDict(
-        # Performance optimizations (Pydantic v2.11+)
-        validate_assignment=True,
-        use_enum_values=True,
-        str_strip_whitespace=True,
-        validate_default=True,
-        arbitrary_types_allowed=False,
-
-        # Memory optimizations
-        extra="forbid",  # Prevent memory bloat from unexpected fields
-        frozen=False,    # Allow mutations for performance
-
-        # Serialization optimizations
-        ser_json_bytes= 'utf8',
-        ser_json_timedelta="float",
-        ser_json_inf_nan="constants",
-
-        # JSON schema optimizations
-        json_schema_extra={
-            "additionalProperties": False
-        }
-    )
-
 class UltimateQueryRequest(UltimateBaseModel):
     """
-    Ultimate query request with comprehensive validation and security
-
-    SECURITY FEATURES:
-    - Advanced prompt injection prevention
-    - Input sanitization and normalization
-    - Rate limiting compatibility
-    - Content analysis and classification
+    SIMPLIFIED Query Request - Just Ask Questions!
+    
+    ChromaDB and the backend handle all the complexity.
+    Frontend just sends questions, gets answers.
     """
-
+    
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "question": "What programming languages and frameworks do you have experience with?",
-                "k": 3,
-                "query_type": "skills",
-                "response_format": "detailed",
-                "include_sources": True,
-                "include_confidence_explanation": False,
-                "language": "en",
-                "max_response_length": 800
+                "question": "What are your main technical skills?"
             }
         }
     )
-
-    # Core fields with enhanced validation
+    
+    # ONLY question is required - everything else is optional!
     question: Annotated[str, StringConstraints(
         min_length=3,
         max_length=2000,
@@ -163,207 +119,102 @@ class UltimateQueryRequest(UltimateBaseModel):
         ...,
         description="Natural language question about Aldo's professional background",
         examples=[
-            "What are your main technical skills and programming languages?",
-            "Tell me about your experience in data analysis and machine learning",
-            "What notable projects have you worked on with Python and APIs?",
-            "Describe your educational background and certifications",
-            "What achievements and accomplishments are you most proud of?"
+            "What are your main technical skills?",
+            "Tell me about your work experience",
+            "What projects have you built?",
+            "Describe your educational background",
+            "What are your achievements?"
         ]
     )
-
-    # Query parameters
-    k: Annotated[int, Field(ge=1, le=10)] = Field(
+    
+    # Everything else is OPTIONAL with smart defaults
+    k: Optional[Annotated[int, Field(ge=1, le=10)]] = Field(
         default=3,
-        description="Number of relevant document chunks to retrieve for context"
+        description="Number of relevant document chunks (backend decides)"
     )
-
+    
     query_type: Optional[QueryType] = Field(
         default=None,
-        description="Query type for optimized processing (auto-detected if not provided)"
+        description="Query type (auto-detected by backend)"
     )
-
-    # Response customization
-    response_format: ResponseFormat = Field(
+    
+    response_format: Optional[ResponseFormat] = Field(
         default=ResponseFormat.DETAILED,
-        description="Desired response format and style"
+        description="Response format (backend chooses)"
     )
-
-    include_sources: bool = Field(
+    
+    include_sources: Optional[bool] = Field(
         default=True,
-        description="Include source document previews in response"
+        description="Include sources (backend decision)"
     )
-
-    include_confidence_explanation: bool = Field(
+    
+    include_confidence_explanation: Optional[bool] = Field(
         default=False,
-        description="Include detailed confidence score explanation"
+        description="Include confidence explanation (backend decision)"
     )
-
-    max_response_length: Optional[Annotated[int, Field(ge=100, le=2000)]] = Field(
-        default=None,
-        description="Maximum response length in characters"
-    )
-
-    # Localization
-    language: Annotated[str, StringConstraints(
+    
+    language: Optional[Annotated[str, StringConstraints(
         pattern=r"^[a-z]{2}(?:-[A-Z]{2})?$"
-    )] = Field(
+    )]] = Field(
         default="en",
-        description="Response language (ISO 639-1 code, optionally with country)"
+        description="Response language (backend detects/defaults)"
     )
-
-    # Advanced options
-    enable_streaming: bool = Field(
-        default=False,
-        description="Enable response streaming (if supported)"
+    
+    max_response_length: Optional[Annotated[int, Field(ge=100, le=2000)]] = Field(
+        default=800,
+        description="Maximum response length (backend manages)"
     )
-
-    temperature_override: Optional[Annotated[float, Field(ge=0.0, le=2.0)]] = Field(
-        default=None,
-        description="Override default AI model temperature"
-    )
-
-    # Request tracking and context
-    request_id: str = Field(
-        default_factory=lambda: str(uuid4()),
-        description="Unique request identifier for tracking and correlation"
-    )
-
-    client_context: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional client context and metadata"
-    )
-
-    # Timestamp
-    submitted_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        description="Request submission timestamp"
-    )
-
+    
     @field_validator("question")
     @classmethod
     def validate_question_security(cls, v: str, info: ValidationInfo) -> str:
         """
-        CRITICAL SECURITY: Comprehensive question validation with latest patterns
-
-        FEATURES:
-        - Advanced prompt injection detection
-        - Content normalization and sanitization
-        - Suspicious pattern detection
-        - Character distribution analysis
+        SIMPLIFIED security validation - just the essentials
         """
-
-        # Normalize whitespace and basic cleanup
+        # Normalize whitespace
         v = re.sub(r'\s+', ' ', v.strip())
-
-        # CRITICAL: Security validation using compiled patterns
-        for pattern in SECURITY_PATTERNS:
-            if pattern.search(v):
+        
+        # Basic security check - simplified patterns
+        security_patterns = [
+            'ignore previous instructions',
+            'system:',
+            'assistant:', 
+            'jailbreak',
+            'override instructions'
+        ]
+        
+        for pattern in security_patterns:
+            if pattern in v.lower():
                 raise ValueError(
-                    f"Question contains potentially unsafe content that could compromise system security"
+                    "Question contains unsafe content"
                 )
-
-        # Enhanced content validation
+        
+        # Basic validation
         words = v.split()
         if len(words) < 2:
             raise ValueError("Question must contain at least 2 meaningful words")
-
-        # Check for suspicious patterns
-        if re.search(r'(.){8,}', v):  # Repeated characters (8+ times)
-            raise ValueError("Question contains suspicious repeated characters")
-
-        # Advanced character distribution analysis
-        total_chars = len(v)
-        alpha_chars = len(re.findall(r'[a-zA-Z]', v))
-        digit_chars = len(re.findall(r'[0-9]', v))
-        space_chars = len(re.findall(r'\s', v))
-        punct_chars = len(re.findall(r'[.!?,:;]', v))
-        special_chars = total_chars - alpha_chars - digit_chars - space_chars - punct_chars
-
-        # Validate character distribution
-        if alpha_chars / total_chars < 0.5:  # Less than 50% alphabetic
-            raise ValueError("Question must contain primarily alphabetic characters")
-
-        if special_chars / total_chars > 0.15:  # More than 15% special characters
-            raise ValueError("Question contains too many special characters")
-
-        # Language detection (basic)
-        if not re.search(r'[a-zA-Z]', v):
-            raise ValueError("Question must contain at least some Latin characters")
-
+        
         return v
-
-    @field_validator("k")
-    @classmethod
-    def validate_k_optimization(cls, v: int, info: ValidationInfo) -> int:
-        """Optimize k parameter based on query context"""
-
-        # Access other validated fields through info.data
-        if hasattr(info, 'data') and info.data:
-            query_type = info.data.get("query_type")
-            question = info.data.get("question", "")
-
-            # Auto-adjust k based on query type and complexity
-            if query_type == QueryType.SUMMARY and v < 5:
-                return 5  # Summary queries need more context
-            elif query_type in [QueryType.CONTACT, QueryType.CERTIFICATIONS] and v > 3:
-                return 3  # Simple queries need less context
-            elif len(question.split()) > 20 and v < 5:  # Complex questions
-                return min(v + 2, 8)  # Add more context but cap at 8
-
-        return v
-
+    
     @computed_field
     @property
     def question_hash(self) -> str:
-        """Computed cache key for performance optimization"""
-        cache_string = f"{self.question}:{self.k}:{self.query_type}:{self.response_format}:{self.language}"
-        return hashlib.blake2b(cache_string.encode(), digest_size=16).hexdigest()
-
-    @computed_field
+        """Simple cache key"""
+        import hashlib
+        return hashlib.md5(self.question.encode()).hexdigest()[:16]
+    
+    @computed_field  
     @property
     def complexity(self) -> QueryComplexity:
-        """Computed query complexity for optimization"""
+        """Simple complexity assessment"""
         word_count = len(self.question.split())
-
+        
         if word_count <= 5:
             return QueryComplexity.SIMPLE
         elif word_count <= 15:
             return QueryComplexity.MEDIUM
-        elif word_count <= 30:
-            return QueryComplexity.COMPLEX
         else:
-            return QueryComplexity.VERY_COMPLEX
-
-    @computed_field
-    @property
-    def estimated_processing_time(self) -> float:
-        """Estimated processing time based on complexity"""
-        base_time = 1.0  # Base processing time in seconds
-
-        complexity_multipliers = {
-            QueryComplexity.SIMPLE: 0.8,
-            QueryComplexity.MEDIUM: 1.0,
-            QueryComplexity.COMPLEX: 1.3,
-            QueryComplexity.VERY_COMPLEX: 1.6
-        }
-
-        return base_time * complexity_multipliers.get(self.complexity, 1.0) * self.k * 0.2
-
-    @model_validator(mode='after')
-    def validate_request_consistency(self) -> 'UltimateQueryRequest':
-        """Comprehensive model validation for consistency"""
-
-        # Adjust response format based on query type
-        if self.query_type == QueryType.TECHNICAL and self.response_format == ResponseFormat.CONVERSATIONAL:
-            self.response_format = ResponseFormat.TECHNICAL
-
-        # Validate max_response_length compatibility
-        if self.response_format == ResponseFormat.SUMMARY and self.max_response_length and self.max_response_length > 400:
-            self.max_response_length = 400
-        elif self.response_format == ResponseFormat.DETAILED and self.max_response_length and self.max_response_length < 200:
-            self.max_response_length = 200
-
-        return self
+            return QueryComplexity.COMPLEX
 
 class UltimateQueryResponse(UltimateBaseModel):
     """
