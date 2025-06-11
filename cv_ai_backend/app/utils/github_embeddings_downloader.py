@@ -189,7 +189,7 @@ class GitHubEmbeddingsDownloader:
             return False
     
     async def _extract_zip(self, zip_path: Path, extract_to: Path):
-        """Extract ZIP file with proper directory structure handling - FIXED VERSION"""
+        """Extract ZIP file with proper directory structure handling - FINAL FIX"""
         def extract():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 # Extraer primero para ver la estructura
@@ -206,16 +206,42 @@ class GitHubEmbeddingsDownloader:
                     
                     # Procesar cada archivo para extraer solo el nombre
                     for file_path in files:
-                        file_name = os.path.basename(file_path)  # Extraer solo el nombre del archivo
+                        # USAR Path().name EN LUGAR DE os.path.basename()
+                        file_name = Path(file_path).name
                         logger.info(f"🔍 Processing file: {file_path} -> filename: {file_name}")
                         
                         if file_name == 'chroma.sqlite3':
-                            chroma_sqlite = Path(root) / file_path
-                            logger.info(f"✅ Found chroma.sqlite3 at: {chroma_sqlite}")
-                            break
+                            # Construir la ruta completa del archivo encontrado
+                            full_path = Path(root) / file_path
+                            logger.info(f"🎯 Attempting to find chroma.sqlite3 at: {full_path}")
+                            
+                            # Verificar que el archivo realmente existe
+                            if full_path.exists():
+                                chroma_sqlite = full_path
+                                logger.info(f"✅ Found and verified chroma.sqlite3 at: {chroma_sqlite}")
+                                break
+                            else:
+                                # Si no existe en la ruta construida, buscar más inteligentemente
+                                logger.warning(f"⚠️ File not found at {full_path}, searching more intelligently...")
+                                
+                                # Buscar el archivo en todos los subdirectorios
+                                for potential_file in Path(root).rglob("chroma.sqlite3"):
+                                    if potential_file.exists():
+                                        chroma_sqlite = potential_file
+                                        logger.info(f"✅ Found chroma.sqlite3 via rglob at: {chroma_sqlite}")
+                                        break
                     
                     if chroma_sqlite:
                         break
+                
+                # Si aún no se encontró, hacer una búsqueda global
+                if not chroma_sqlite:
+                    logger.info("🔍 Global search for chroma.sqlite3...")
+                    for potential_file in extract_to.rglob("chroma.sqlite3"):
+                        if potential_file.exists():
+                            chroma_sqlite = potential_file
+                            logger.info(f"✅ Found chroma.sqlite3 via global search at: {chroma_sqlite}")
+                            break
                 
                 if chroma_sqlite and chroma_sqlite.exists():
                     # Determinar la ruta padre del archivo encontrado
@@ -237,10 +263,13 @@ class GitHubEmbeddingsDownloader:
                         shutil.move(str(chroma_sqlite), str(dest_sqlite))
                         logger.info(f"✅ Moved chroma.sqlite3 to root directory")
                         
-                        # Buscar y mover directorios UUID
+                        # Buscar y mover directorios UUID usando búsqueda inteligente
                         uuid_dirs = []
                         for item in extract_to.rglob("*"):
-                            if item.is_dir() and len(item.name) == 36 and item.name.count('-') == 4:  # UUID format
+                            if (item.is_dir() and 
+                                len(item.name) == 36 and 
+                                item.name.count('-') == 4 and
+                                item != extract_to):  # UUID format y no es el directorio raíz
                                 uuid_dirs.append(item)
                         
                         logger.info(f"📂 Found UUID directories: {[str(d) for d in uuid_dirs]}")
@@ -269,6 +298,9 @@ class GitHubEmbeddingsDownloader:
                         logger.info("✅ Files already in correct location, no moving needed")
                 else:
                     logger.warning("❌ No chroma.sqlite3 file found in extracted content")
+                    # Log para debug: mostrar todos los archivos encontrados
+                    all_files = list(extract_to.rglob("*"))
+                    logger.info(f"🔍 All files found in extraction: {[str(f) for f in all_files if f.is_file()]}")
                 
                 # Log estado final
                 final_files = []
