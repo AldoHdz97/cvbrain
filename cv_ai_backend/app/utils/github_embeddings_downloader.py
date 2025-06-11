@@ -260,9 +260,14 @@ class GitHubEmbeddingsDownloader:
                     logger.info(f"📍 Target directory: {extract_to}")
                     logger.info(f"📍 Are they equal? {source_dir == extract_to}")
                     
-                    if source_dir != extract_to:
-                        # Los archivos están en un subdirectorio, moverlos
-                        logger.info(f"📂 MOVING ChromaDB files from {source_dir} to {extract_to}")
+                    # NUEVO: Verificar si el archivo está realmente en la raíz
+                    sqlite_in_root = extract_to / 'chroma.sqlite3'
+                    files_need_moving = not sqlite_in_root.exists()
+                    logger.info(f"🔍 Files need moving? {files_need_moving}")
+                    
+                    if files_need_moving:
+                        # FORZAR MOVIMIENTO independientemente de la comparación de directorios
+                        logger.info(f"📂 FORCING ChromaDB files movement to root directory")
                         
                         # Mover chroma.sqlite3
                         dest_sqlite = extract_to / 'chroma.sqlite3'
@@ -273,26 +278,28 @@ class GitHubEmbeddingsDownloader:
                         shutil.move(str(chroma_sqlite), str(dest_sqlite))
                         logger.info(f"✅ Moved chroma.sqlite3 to root directory")
                         
-                        # Buscar y mover directorios UUID - búsqueda mejorada
+                        # Buscar y mover directorios UUID - búsqueda más agresiva
                         uuid_dirs = []
                         for item in extract_to.rglob("*"):
                             if (item.is_dir() and 
                                 len(item.name) == 36 and 
                                 item.name.count('-') == 4 and
-                                item != extract_to):  # UUID format y no es el directorio raíz
+                                item != extract_to and
+                                item.parent != extract_to):  # Solo si NO está en la raíz
                                 uuid_dirs.append(item)
                         
-                        logger.info(f"📂 Found UUID directories: {[str(d) for d in uuid_dirs]}")
+                        logger.info(f"📂 Found UUID directories to move: {[str(d) for d in uuid_dirs]}")
                         
                         for uuid_dir in uuid_dirs:
                             dest = extract_to / uuid_dir.name
-                            if dest.exists() and dest != uuid_dir:
+                            logger.info(f"📂 Moving UUID directory: {uuid_dir} -> {dest}")
+                            
+                            if dest.exists():
                                 shutil.rmtree(dest)
                                 logger.info(f"🗑️ Removed existing directory: {dest}")
                             
-                            if uuid_dir != dest:
-                                shutil.move(str(uuid_dir), str(dest))
-                                logger.info(f"✅ Moved UUID directory: {uuid_dir.name}")
+                            shutil.move(str(uuid_dir), str(dest))
+                            logger.info(f"✅ Moved UUID directory: {uuid_dir.name}")
                         
                         # Limpiar directorios temporales vacíos - versión mejorada
                         for temp_name in ['embeddings', 'chroma']:
@@ -300,20 +307,12 @@ class GitHubEmbeddingsDownloader:
                             if temp_path.exists() and temp_path.is_dir():
                                 try:
                                     # Verificar si está vacío recursivamente
-                                    if not any(temp_path.rglob("*")):
+                                    remaining_files = list(temp_path.rglob("*"))
+                                    if not remaining_files:
                                         shutil.rmtree(temp_path)
                                         logger.info(f"✅ Cleaned up empty directory: {temp_name}")
                                     else:
-                                        # Si no está vacío, intentar mover su contenido
-                                        logger.info(f"🔄 Moving content from {temp_name} directory...")
-                                        for item in temp_path.rglob("*"):
-                                            if item.is_file():
-                                                relative_path = item.relative_to(temp_path)
-                                                dest_file = extract_to / relative_path.name
-                                                if not dest_file.exists():
-                                                    dest_file.parent.mkdir(parents=True, exist_ok=True)
-                                                    shutil.move(str(item), str(dest_file))
-                                                    logger.info(f"✅ Moved file: {relative_path.name}")
+                                        logger.info(f"⚠️ Directory {temp_name} still has {len(remaining_files)} items, skipping cleanup")
                                 except Exception as e:
                                     logger.warning(f"⚠️ Could not clean up {temp_name}: {e}")
                     else:
