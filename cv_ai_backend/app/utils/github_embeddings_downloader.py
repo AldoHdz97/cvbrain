@@ -189,7 +189,7 @@ class GitHubEmbeddingsDownloader:
             return False
     
     async def _extract_zip(self, zip_path: Path, extract_to: Path):
-        """Extract ZIP file with proper directory structure handling - FINAL FIX"""
+        """Extract ZIP file with proper directory structure handling - ULTIMATE FIX"""
         def extract():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 # Extraer primero para ver la estructura
@@ -206,8 +206,9 @@ class GitHubEmbeddingsDownloader:
                     
                     # Procesar cada archivo para extraer solo el nombre
                     for file_path in files:
-                        # USAR Path().name EN LUGAR DE os.path.basename()
-                        file_name = Path(file_path).name
+                        # EXTRACCIÓN MANUAL DEL NOMBRE DEL ARCHIVO
+                        # Manejar tanto separadores \ como /
+                        file_name = file_path.replace('\\', '/').split('/')[-1]
                         logger.info(f"🔍 Processing file: {file_path} -> filename: {file_name}")
                         
                         if file_name == 'chroma.sqlite3':
@@ -224,7 +225,7 @@ class GitHubEmbeddingsDownloader:
                                 # Si no existe en la ruta construida, buscar más inteligentemente
                                 logger.warning(f"⚠️ File not found at {full_path}, searching more intelligently...")
                                 
-                                # Buscar el archivo en todos los subdirectorios
+                                # Buscar el archivo en todos los subdirectorios de root
                                 for potential_file in Path(root).rglob("chroma.sqlite3"):
                                     if potential_file.exists():
                                         chroma_sqlite = potential_file
@@ -234,13 +235,22 @@ class GitHubEmbeddingsDownloader:
                     if chroma_sqlite:
                         break
                 
-                # Si aún no se encontró, hacer una búsqueda global
+                # Si aún no se encontró, hacer una búsqueda global más agresiva
                 if not chroma_sqlite:
                     logger.info("🔍 Global search for chroma.sqlite3...")
                     for potential_file in extract_to.rglob("chroma.sqlite3"):
                         if potential_file.exists():
                             chroma_sqlite = potential_file
                             logger.info(f"✅ Found chroma.sqlite3 via global search at: {chroma_sqlite}")
+                            break
+                
+                # BÚSQUEDA ALTERNATIVA: Si todo falla, buscar por contenido del directorio
+                if not chroma_sqlite:
+                    logger.info("🔍 Alternative search: looking for sqlite3 files...")
+                    for potential_file in extract_to.rglob("*.sqlite3"):
+                        if potential_file.exists() and 'chroma' in potential_file.name:
+                            chroma_sqlite = potential_file
+                            logger.info(f"✅ Found chroma sqlite file via pattern search: {chroma_sqlite}")
                             break
                 
                 if chroma_sqlite and chroma_sqlite.exists():
@@ -263,7 +273,7 @@ class GitHubEmbeddingsDownloader:
                         shutil.move(str(chroma_sqlite), str(dest_sqlite))
                         logger.info(f"✅ Moved chroma.sqlite3 to root directory")
                         
-                        # Buscar y mover directorios UUID usando búsqueda inteligente
+                        # Buscar y mover directorios UUID - búsqueda mejorada
                         uuid_dirs = []
                         for item in extract_to.rglob("*"):
                             if (item.is_dir() and 
@@ -284,16 +294,28 @@ class GitHubEmbeddingsDownloader:
                                 shutil.move(str(uuid_dir), str(dest))
                                 logger.info(f"✅ Moved UUID directory: {uuid_dir.name}")
                         
-                        # Limpiar directorios temporales vacíos
-                        temp_dirs = [d for d in extract_to.iterdir() if d.is_dir() and d.name in ['embeddings', 'chroma']]
-                        for temp_dir in temp_dirs:
-                            if temp_dir.exists():
-                                # Verificar si está vacío (recursivamente)
-                                if not any(temp_dir.rglob("*")):
-                                    shutil.rmtree(temp_dir)
-                                    logger.info(f"✅ Cleaned up empty directory: {temp_dir.name}")
-                                else:
-                                    logger.info(f"⚠️ Skipping cleanup of {temp_dir} (not empty)")
+                        # Limpiar directorios temporales vacíos - versión mejorada
+                        for temp_name in ['embeddings', 'chroma']:
+                            temp_path = extract_to / temp_name
+                            if temp_path.exists() and temp_path.is_dir():
+                                try:
+                                    # Verificar si está vacío recursivamente
+                                    if not any(temp_path.rglob("*")):
+                                        shutil.rmtree(temp_path)
+                                        logger.info(f"✅ Cleaned up empty directory: {temp_name}")
+                                    else:
+                                        # Si no está vacío, intentar mover su contenido
+                                        logger.info(f"🔄 Moving content from {temp_name} directory...")
+                                        for item in temp_path.rglob("*"):
+                                            if item.is_file():
+                                                relative_path = item.relative_to(temp_path)
+                                                dest_file = extract_to / relative_path.name
+                                                if not dest_file.exists():
+                                                    dest_file.parent.mkdir(parents=True, exist_ok=True)
+                                                    shutil.move(str(item), str(dest_file))
+                                                    logger.info(f"✅ Moved file: {relative_path.name}")
+                                except Exception as e:
+                                    logger.warning(f"⚠️ Could not clean up {temp_name}: {e}")
                     else:
                         logger.info("✅ Files already in correct location, no moving needed")
                 else:
