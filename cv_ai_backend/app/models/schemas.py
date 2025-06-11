@@ -93,6 +93,18 @@ class QueryComplexity(str, Enum):
     MEDIUM = "medium"          # 6-15 words
     COMPLEX = "complex"        # 16-30 words
     VERY_COMPLEX = "very_complex"  # >30 words
+    
+class UltimateBaseModel(BaseModel):
+    """Ultimate base model with Pydantic v2 optimizations"""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        use_enum_values=True,
+        str_strip_whitespace=True,
+        validate_default=True,
+        extra="forbid",
+        json_schema_extra={"additionalProperties": False}
+    )
 
 class UltimateQueryRequest(UltimateBaseModel):
     """
