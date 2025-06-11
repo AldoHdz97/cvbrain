@@ -23,7 +23,7 @@ class GitHubEmbeddingsDownloader:
     
     def __init__(self, settings):
         self.settings = settings
-        ##########################Cambiar estas variables por variables de entorno en Railway- Es una opcion
+        
         # Configuration
         self.github_user = "AldoHdz97"
         self.github_repo = "cvbrain"
@@ -40,23 +40,79 @@ class GitHubEmbeddingsDownloader:
         logger.info(f"Download URL: {self.download_url}")
     
     def _check_embeddings_exist(self) -> bool:
-        """Check if embeddings are already present"""
+        """Check if embeddings are present - COMPREHENSIVE VERSION"""
         chroma_dir = Path(self.settings.chroma_persist_dir)
-        
-        # Check for key ChromaDB files
-        required_files = [
-            "chroma.sqlite3",
-            # Could also check for specific collection folders
-        ]
-        
-        for file in required_files:
-            if not (chroma_dir / file).exists():
-                logger.info(f"Missing embedding file: {file}")
-                return False
-        
-        logger.info("✅ Embeddings already exist")
-        return True
     
+        if not chroma_dir.exists():
+            logger.info("❌ Embeddings directory doesn't exist")
+            return False
+    
+        # Lista completa de archivos que ChromaDB puede generar
+        chromadb_patterns = [
+            # Base de datos principal
+            "chroma.sqlite3",
+            "chroma.sqlite3-wal",
+            "chroma.sqlite3-shm",
+            
+            # Archivos de índices HNSW
+            "data_level0.bin",
+            "header.bin", 
+            "length.bin",
+            "link_lists.bin",
+            
+            # Archivos de metadatos
+            "index_metadata.pickle",
+            "id_to_uuid.pkl",
+            "uuid_to_id.pkl",
+            
+            # Otros archivos posibles
+            "*.index",
+            "*.bin",
+            "*.pkl",
+            "*.pickle",
+            "*.sqlite*"
+        ]
+    
+        found_files = []
+        all_files = []
+    
+        # Buscar recursivamente todos los archivos
+        for item in chroma_dir.rglob("*"):
+            if item.is_file():
+                all_files.append(str(item.relative_to(chroma_dir)))
+            
+                # Verificar contra patrones conocidos
+                for pattern in chromadb_patterns:
+                    if pattern.startswith("*"):
+                        # Pattern con wildcard
+                        if item.name.endswith(pattern[1:]) or item.suffix == pattern[1:]:
+                            found_files.append(str(item.relative_to(chroma_dir)))
+                            break
+                    else:
+                        # Pattern exacto
+                        if item.name == pattern:
+                            found_files.append(str(item.relative_to(chroma_dir)))
+                            break
+    
+        # Log de todos los archivos encontrados para debug
+        logger.info(f"📁 All files in embeddings directory: {all_files}")
+        logger.info(f"🔍 ChromaDB files found: {found_files}")
+    
+        # Criterios para considerar que los embeddings están presentes
+        has_sqlite = any("sqlite" in f for f in found_files)
+        has_bin_files = any(".bin" in f for f in found_files)
+        has_any_chromadb = len(found_files) > 0
+    
+        if has_sqlite or (has_bin_files and len(found_files) >= 2):
+            logger.info(f"✅ ChromaDB files detected: {len(found_files)} files")
+            return True
+        elif has_any_chromadb:
+            logger.warning(f"⚠️ Some ChromaDB files found but may be incomplete: {found_files}")
+            return True  # Intentar usar lo que hay
+        else:
+            logger.info(f"❌ No ChromaDB files detected in {len(all_files)} total files")
+            return False
+
     async def download_and_extract(self) -> bool:
         """
         Download embeddings from GitHub Releases and extract them
