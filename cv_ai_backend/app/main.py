@@ -98,7 +98,7 @@ async def get_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/admin/setup-cv-data")
+@app.get("/admin/setup-cv-data")
 async def setup_cv_data():
     """One-time setup to load CV data into ChromaDB"""
     try:
