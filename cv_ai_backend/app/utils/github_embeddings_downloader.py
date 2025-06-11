@@ -333,6 +333,30 @@ class GitHubEmbeddingsDownloader:
                         final_files.append(f"{item.name}/")
                 
                 logger.info(f"📁 Final items in extract directory: {final_files}")
+                
+                # DEBUG: Verificar el estado final más detalladamente
+                logger.info("🔍 FINAL DEBUG - Checking file structure:")
+                for item in extract_to.iterdir():
+                    if item.is_file():
+                        logger.info(f"📄 FILE: {item.name} (size: {item.stat().st_size} bytes)")
+                    elif item.is_dir():
+                        logger.info(f"📁 DIR: {item.name}/")
+                        # Listar contenido de subdirectorios también
+                        for subitem in item.iterdir():
+                            if subitem.is_file():
+                                logger.info(f"  📄 SUBFILE: {subitem.name}")
+                            elif subitem.is_dir():
+                                logger.info(f"  📁 SUBDIR: {subitem.name}/")
+
+                # Verificar específicamente si chroma.sqlite3 está en la raíz
+                sqlite_in_root = extract_to / 'chroma.sqlite3'
+                logger.info(f"🎯 chroma.sqlite3 in root? {sqlite_in_root.exists()}")
+                if sqlite_in_root.exists():
+                    logger.info(f"✅ ROOT SQLITE SIZE: {sqlite_in_root.stat().st_size} bytes")
+
+                # Verificar si hay directorios UUID en la raíz
+                uuid_in_root = [d for d in extract_to.iterdir() if d.is_dir() and len(d.name) == 36]
+                logger.info(f"🔑 UUID directories in root: {[d.name for d in uuid_in_root]}")
         
         # Run in thread to avoid blocking
         await asyncio.to_thread(extract)
