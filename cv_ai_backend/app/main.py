@@ -98,6 +98,32 @@ async def get_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/admin/setup-cv-data")
+async def setup_cv_data():
+    """One-time setup to load CV data into ChromaDB"""
+    try:
+        # Import your setup script
+        from app.scripts.setup_cv_data import load_cv_data
+        
+        result = await load_cv_data()
+        
+        if result:
+            return {
+                "status": "success",
+                "message": "CV data loaded successfully into ChromaDB",
+                "action": "Your CV-AI system is now ready!"
+            }
+        else:
+            return {
+                "status": "error", 
+                "message": "Failed to load CV data"
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Setup failed: {str(e)}"
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
