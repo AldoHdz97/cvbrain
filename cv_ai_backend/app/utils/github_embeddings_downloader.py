@@ -167,6 +167,10 @@ class GitHubEmbeddingsDownloader:
             # Verify extraction
             if self._check_embeddings_exist():
                 logger.info("✅ Embeddings downloaded and extracted successfully!")
+                
+                # CRITICAL: Signal that ChromaDB needs to be reinitialized
+                logger.info("🔄 ChromaDB needs to be reinitialized to load existing data")
+                
                 return True
             else:
                 logger.error("❌ Extraction verification failed")
@@ -185,41 +189,76 @@ class GitHubEmbeddingsDownloader:
             return False
     
     async def _extract_zip(self, zip_path: Path, extract_to: Path):
-        """Extract ZIP file with proper directory structure handling"""
+        """Extract ZIP file with proper directory structure handling - DEBUG VERSION"""
         def extract():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 # Extraer primero para ver la estructura
                 zip_ref.extractall(extract_to)
+                logger.info(f"🔍 ZIP extracted to: {extract_to}")
+                
+                # DEBUG: Listar todo lo que se extrajo
+                for root, dirs, files in os.walk(extract_to):
+                    logger.info(f"📁 Directory: {root}")
+                    logger.info(f"📁 Subdirs: {dirs}")
+                    logger.info(f"📄 Files: {files}")
                 
                 # Buscar si los archivos están en subdirectorios
                 chroma_sqlite = None
                 for root, dirs, files in os.walk(extract_to):
+                    logger.info(f"🔍 Checking directory: {root}")
+                    logger.info(f"🔍 Files in directory: {files}")
                     if 'chroma.sqlite3' in files:
                         chroma_sqlite = Path(root) / 'chroma.sqlite3'
+                        logger.info(f"✅ Found chroma.sqlite3 at: {chroma_sqlite}")
                         break
                 
-                if chroma_sqlite and chroma_sqlite.parent != extract_to:
-                    # Los archivos están en un subdirectorio, moverlos
-                    logger.info(f"📂 Moving ChromaDB files from {chroma_sqlite.parent} to {extract_to}")
+                if chroma_sqlite:
+                    logger.info(f"📍 chroma_sqlite.parent: {chroma_sqlite.parent}")
+                    logger.info(f"📍 extract_to: {extract_to}")
+                    logger.info(f"📍 Are they equal? {chroma_sqlite.parent == extract_to}")
                     
-                    # Mover chroma.sqlite3
-                    shutil.move(str(chroma_sqlite), str(extract_to / 'chroma.sqlite3'))
-                    
-                    # Mover todos los directorios con UUIDs (contienen índices)
-                    for item in chroma_sqlite.parent.iterdir():
-                        if item.is_dir():
-                            dest = extract_to / item.name
-                            if dest.exists():
-                                shutil.rmtree(dest)
-                            shutil.move(str(item), str(dest))
-                            logger.info(f"📂 Moved index directory: {item.name}")
-                    
-                    # Limpiar directorio temporal
-                    temp_dirs = [d for d in extract_to.iterdir() if d.is_dir() and d.name in ['embeddings', 'chroma']]
-                    for temp_dir in temp_dirs:
-                        if temp_dir.exists() and not any(temp_dir.glob('*.sqlite3')):
-                            shutil.rmtree(temp_dir)
-                            logger.info(f"🧹 Cleaned up temporary directory: {temp_dir.name}")
+                    if chroma_sqlite.parent != extract_to:
+                        # Los archivos están en un subdirectorio, moverlos
+                        logger.info(f"📂 MOVING ChromaDB files from {chroma_sqlite.parent} to {extract_to}")
+                        
+                        # Mover chroma.sqlite3
+                        dest_sqlite = extract_to / 'chroma.sqlite3'
+                        if dest_sqlite.exists():
+                            dest_sqlite.unlink()  # Remover archivo existente
+                            logger.info(f"🗑️ Removed existing chroma.sqlite3")
+                        
+                        shutil.move(str(chroma_sqlite), str(dest_sqlite))
+                        logger.info(f"✅ Moved chroma.sqlite3 to root directory")
+                        
+                        # Mover todos los directorios con UUIDs (contienen índices)
+                        for item in chroma_sqlite.parent.iterdir():
+                            if item.is_dir():
+                                dest = extract_to / item.name
+                                logger.info(f"📂 Moving directory: {item} -> {dest}")
+                                if dest.exists():
+                                    shutil.rmtree(dest)
+                                    logger.info(f"🗑️ Removed existing directory: {dest}")
+                                shutil.move(str(item), str(dest))
+                                logger.info(f"✅ Moved index directory: {item.name}")
+                        
+                        # Limpiar directorio temporal
+                        temp_dirs = [d for d in extract_to.iterdir() if d.is_dir() and d.name in ['embeddings', 'chroma']]
+                        logger.info(f"🧹 Temp directories to clean: {[str(d) for d in temp_dirs]}")
+                        for temp_dir in temp_dirs:
+                            if temp_dir.exists() and not any(temp_dir.glob('*.sqlite3')):
+                                logger.info(f"🧹 Cleaning up temporary directory: {temp_dir}")
+                                shutil.rmtree(temp_dir)
+                                logger.info(f"✅ Cleaned up temporary directory: {temp_dir.name}")
+                            else:
+                                logger.info(f"⚠️ Skipping cleanup of {temp_dir} (contains sqlite3 or doesn't exist)")
+                    else:
+                        logger.info("✅ Files already in correct location, no moving needed")
+                else:
+                    logger.warning("❌ No chroma.sqlite3 file found in extracted content")
+                
+                # Log final estado
+                final_files = [f.name for f in extract_to.iterdir()]
+                logger.info(f"📁 Final files in extract directory: {final_files}")
         
         # Run in thread to avoid blocking
         await asyncio.to_thread(extract)
