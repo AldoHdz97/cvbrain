@@ -41,7 +41,7 @@ class UltimateCVService:
         self.settings = get_settings()
         self._initialized = False
 
-        # Initialize all ultimate components
+        # Initialize core components first
         self.connection_manager = UltimateConnectionManager(
             max_connections=self.settings.openai_max_connections,
             max_connection_age=3600,
@@ -63,7 +63,8 @@ class UltimateCVService:
             } if self.settings.redis_url else None
         )
 
-        self.chromadb_manager = UltimateChromaDBManager(self.settings)
+        # ChromaDB will be initialized AFTER embeddings are ready
+        self.chromadb_manager = None
 
         # Service state
         self._startup_time = datetime.utcnow()
@@ -71,30 +72,46 @@ class UltimateCVService:
         logger.info(f"Ultimate CV Service initialized with all advanced components")
 
     async def initialize(self) -> bool:
-        """Initialize all service components"""
+        """Initialize all service components with proper embeddings flow"""
         try:
             logger.info("🚀 Initializing Ultimate CV Service...")
 
+            # STEP 1: Ensure embeddings are available FIRST
             logger.info("🔍 Checking embeddings availability...")
             embeddings_ready = await ensure_embeddings_available(self.settings)
 
-            # Ensure embeddings are available 
             if not embeddings_ready:
                 logger.error("❌ Failed to ensure embeddings availability")
                 logger.warning("⚠️ Continuing without verified embeddings...")
 
-            # Initialize cache system
+            # STEP 2: Initialize cache system
             cache_success = await self.cache_system.initialize()
             if not cache_success:
                 logger.warning("Cache system initialization failed, continuing with memory only")
 
-            # Initialize ChromaDB manager
+            # STEP 3: Initialize ChromaDB AFTER embeddings are in place
+            logger.info("🔌 Initializing ChromaDB with embeddings...")
+            self.chromadb_manager = UltimateChromaDBManager(self.settings)
             chromadb_success = await self.chromadb_manager.initialize()
+            
             if not chromadb_success:
-                logger.error("ChromaDB initialization failed")
+                logger.error("❌ ChromaDB initialization failed")
                 return False
 
-            # Warm cache with common queries if needed
+            # STEP 4: Verify ChromaDB has data
+            try:
+                collection_stats = self.chromadb_manager.get_stats()
+                document_count = collection_stats.get("total_documents", 0)
+                
+                if document_count > 0:
+                    logger.info(f"✅ ChromaDB loaded successfully with {document_count} documents")
+                else:
+                    logger.warning("⚠️ ChromaDB initialized but no documents found - this may be normal for first run")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Could not verify ChromaDB document count: {e}")
+
+            # STEP 5: Warm cache with common queries
             await self._warm_cache()
 
             self._initialized = True
@@ -120,6 +137,9 @@ class UltimateCVService:
 
         if not self._initialized:
             raise Exception("Service not initialized")
+
+        if not self.chromadb_manager:
+            raise Exception("ChromaDB manager not initialized")
 
         try:
             # Check cache first (L1: Memory, L2: Redis, L3: Disk)
@@ -515,6 +535,13 @@ My Response:"""
         """Get comprehensive service statistics"""
         uptime = (datetime.utcnow() - self._startup_time).total_seconds()
 
+        chromadb_stats = {}
+        if self.chromadb_manager:
+            try:
+                chromadb_stats = self.chromadb_manager.get_stats()
+            except Exception as e:
+                chromadb_stats = {"error": str(e)}
+
         return {
             "service_info": {
                 "name": "Ultimate CV Service",
@@ -525,7 +552,7 @@ My Response:"""
             },
             "connection_manager": self.connection_manager.get_stats(),
             "cache_system": await self.cache_system.get_comprehensive_stats(),
-            "chromadb_manager": self.chromadb_manager.get_stats(),
+            "chromadb_manager": chromadb_stats,
             "performance": {
                 "avg_query_time": "< 2 seconds",
                 "cache_hit_rate": "85%+",
@@ -539,7 +566,8 @@ My Response:"""
 
         try:
             # Cleanup in reverse order of initialization
-            await self.chromadb_manager.cleanup()
+            if self.chromadb_manager:
+                await self.chromadb_manager.cleanup()
             await self.cache_system.cleanup()
             await self.connection_manager.cleanup_all()
 
