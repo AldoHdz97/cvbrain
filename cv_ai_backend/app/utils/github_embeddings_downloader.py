@@ -8,9 +8,10 @@ import httpx
 import zipfile
 import tarfile
 import logging
+import os
+import shutil
 from pathlib import Path
 from typing import Optional
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -184,10 +185,41 @@ class GitHubEmbeddingsDownloader:
             return False
     
     async def _extract_zip(self, zip_path: Path, extract_to: Path):
-        """Extract ZIP file"""
+        """Extract ZIP file with proper directory structure handling"""
         def extract():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                # Extraer primero para ver la estructura
                 zip_ref.extractall(extract_to)
+                
+                # Buscar si los archivos están en subdirectorios
+                chroma_sqlite = None
+                for root, dirs, files in os.walk(extract_to):
+                    if 'chroma.sqlite3' in files:
+                        chroma_sqlite = Path(root) / 'chroma.sqlite3'
+                        break
+                
+                if chroma_sqlite and chroma_sqlite.parent != extract_to:
+                    # Los archivos están en un subdirectorio, moverlos
+                    logger.info(f"📂 Moving ChromaDB files from {chroma_sqlite.parent} to {extract_to}")
+                    
+                    # Mover chroma.sqlite3
+                    shutil.move(str(chroma_sqlite), str(extract_to / 'chroma.sqlite3'))
+                    
+                    # Mover todos los directorios con UUIDs (contienen índices)
+                    for item in chroma_sqlite.parent.iterdir():
+                        if item.is_dir():
+                            dest = extract_to / item.name
+                            if dest.exists():
+                                shutil.rmtree(dest)
+                            shutil.move(str(item), str(dest))
+                            logger.info(f"📂 Moved index directory: {item.name}")
+                    
+                    # Limpiar directorio temporal
+                    temp_dirs = [d for d in extract_to.iterdir() if d.is_dir() and d.name in ['embeddings', 'chroma']]
+                    for temp_dir in temp_dirs:
+                        if temp_dir.exists() and not any(temp_dir.glob('*.sqlite3')):
+                            shutil.rmtree(temp_dir)
+                            logger.info(f"🧹 Cleaned up temporary directory: {temp_dir.name}")
         
         # Run in thread to avoid blocking
         await asyncio.to_thread(extract)
