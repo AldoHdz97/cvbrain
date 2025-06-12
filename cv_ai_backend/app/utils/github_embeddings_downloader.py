@@ -1,5 +1,5 @@
 """
-GitHub Embeddings Auto-Downloader for Railway Deployment
+GitHub Embeddings Auto-Downloader for Railway Deployment - CORREGIDO
 Downloads embeddings from GitHub Releases automatically
 """
 
@@ -29,7 +29,7 @@ class GitHubEmbeddingsDownloader:
         self.github_user = "AldoHdz97"
         self.github_repo = "cvbrain"
         self.release_version = "v1.0.0"
-        self.filename = "cv_embeddings.zip"
+        self.filename = "embeddings.zip"  # ✅ CORREGIDO: Nuevo nombre
         
         # Build download URL
         self.download_url = (
@@ -189,213 +189,85 @@ class GitHubEmbeddingsDownloader:
             return False
     
     async def _extract_zip(self, zip_path: Path, extract_to: Path):
-        """Extract ZIP file with proper directory structure handling - ULTIMATE FIX"""
+        """Extract ZIP file with optimized structure handling - FINAL VERSION"""
         def extract():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                # Extraer primero para ver la estructura
+                # Extraer directamente - con la nueva estructura debería ser directo
                 zip_ref.extractall(extract_to)
                 logger.info(f"🔍 ZIP extracted to: {extract_to}")
                 
-                # Buscar chroma.sqlite3 en cualquier ubicación
-                chroma_sqlite = None
-                
-                # Buscar recursivamente el archivo
-                for root, dirs, files in os.walk(extract_to):
-                    logger.info(f"🔍 Checking directory: {root}")
-                    logger.info(f"🔍 Files in directory: {files}")
-                    
-                    # Procesar cada archivo para extraer solo el nombre
-                    for file_path in files:
-                        # EXTRACCIÓN MANUAL DEL NOMBRE DEL ARCHIVO
-                        # Manejar tanto separadores \ como /
-                        file_name = file_path.replace('\\', '/').split('/')[-1]
-                        logger.info(f"🔍 Processing file: {file_path} -> filename: {file_name}")
-                        
-                        if file_name == 'chroma.sqlite3':
-                            # Construir la ruta completa del archivo encontrado
-                            full_path = Path(root) / file_path
-                            logger.info(f"🎯 Attempting to find chroma.sqlite3 at: {full_path}")
-                            
-                            # Verificar que el archivo realmente existe
-                            if full_path.exists():
-                                chroma_sqlite = full_path
-                                logger.info(f"✅ Found and verified chroma.sqlite3 at: {chroma_sqlite}")
-                                break
-                            else:
-                                # Si no existe en la ruta construida, buscar más inteligentemente
-                                logger.warning(f"⚠️ File not found at {full_path}, searching more intelligently...")
-                                
-                                # Buscar el archivo en todos los subdirectorios de root
-                                for potential_file in Path(root).rglob("chroma.sqlite3"):
-                                    if potential_file.exists():
-                                        chroma_sqlite = potential_file
-                                        logger.info(f"✅ Found chroma.sqlite3 via rglob at: {chroma_sqlite}")
-                                        break
-                    
-                    if chroma_sqlite:
-                        break
-                
-                # Si aún no se encontró, hacer una búsqueda global más agresiva
-                if not chroma_sqlite:
-                    logger.info("🔍 Global search for chroma.sqlite3...")
-                    for potential_file in extract_to.rglob("chroma.sqlite3"):
-                        if potential_file.exists():
-                            chroma_sqlite = potential_file
-                            logger.info(f"✅ Found chroma.sqlite3 via global search at: {chroma_sqlite}")
-                            break
-                
-                # BÚSQUEDA ALTERNATIVA: Si todo falla, buscar por contenido del directorio
-                if not chroma_sqlite:
-                    logger.info("🔍 Alternative search: looking for sqlite3 files...")
-                    for potential_file in extract_to.rglob("*.sqlite3"):
-                        if potential_file.exists() and 'chroma' in potential_file.name:
-                            chroma_sqlite = potential_file
-                            logger.info(f"✅ Found chroma sqlite file via pattern search: {chroma_sqlite}")
-                            break
-                
-                if chroma_sqlite and chroma_sqlite.exists():
-                    # Determinar la ruta padre del archivo encontrado
-                    source_dir = chroma_sqlite.parent
-                    logger.info(f"📍 Source directory: {source_dir}")
-                    logger.info(f"📍 Target directory: {extract_to}")
-                    logger.info(f"📍 Are they equal? {source_dir == extract_to}")
-                    
-                    # NUEVO: Verificar si el archivo está realmente en la raíz
-                    sqlite_in_root = extract_to / 'chroma.sqlite3'
-                    files_need_moving = not sqlite_in_root.exists()
-                    logger.info(f"🔍 Files need moving? {files_need_moving}")
-                    
-                    if files_need_moving:
-                        # FORZAR MOVIMIENTO independientemente de la comparación de directorios
-                        logger.info(f"📂 FORCING ChromaDB files movement to root directory")
-                        
-                        # Mover chroma.sqlite3
-                        dest_sqlite = extract_to / 'chroma.sqlite3'
-                        if dest_sqlite.exists():
-                            dest_sqlite.unlink()
-                            logger.info(f"🗑️ Removed existing chroma.sqlite3")
-                        
-                        shutil.move(str(chroma_sqlite), str(dest_sqlite))
-                        logger.info(f"✅ Moved chroma.sqlite3 to root directory")
-                        
-                        # Buscar y mover directorios UUID - búsqueda más agresiva
-                        uuid_dirs = []
-                        for item in extract_to.rglob("*"):
-                            if (item.is_dir() and 
-                                len(item.name) == 36 and 
-                                item.name.count('-') == 4 and
-                                item != extract_to and
-                                item.parent != extract_to):  # Solo si NO está en la raíz
-                                uuid_dirs.append(item)
-                        
-                        logger.info(f"📂 Found UUID directories to move: {[str(d) for d in uuid_dirs]}")
-                        
-                        # Si encontramos directorios UUID, moverlos completos
-                        if uuid_dirs:
-                            for uuid_dir in uuid_dirs:
-                                dest = extract_to / uuid_dir.name
-                                logger.info(f"📂 Moving UUID directory: {uuid_dir} -> {dest}")
-                                
-                                if dest.exists():
-                                    shutil.rmtree(dest)
-                                    logger.info(f"🗑️ Removed existing directory: {dest}")
-                                
-                                shutil.move(str(uuid_dir), str(dest))
-                                logger.info(f"✅ Moved UUID directory: {uuid_dir.name}")
-                        else:
-                            # NUEVO: Si no encontramos directorios UUID, buscar archivos .bin individuales
-                            logger.info("🔍 No UUID directories found, searching for individual .bin files...")
-                            
-                            bin_files = []
-                            for item in extract_to.rglob("*.bin"):
-                                if item.parent != extract_to:  # Solo si NO están en la raíz
-                                    bin_files.append(item)
-                            
-                            logger.info(f"📄 Found .bin files to move: {[str(f) for f in bin_files]}")
-                            
-                            # Crear directorio UUID en la raíz basado en el nombre del directorio fuente
-                            if bin_files:
-                                # Obtener el UUID del primer archivo encontrado
-                                source_uuid_path = bin_files[0].parent
-                                uuid_name = source_uuid_path.name
-                                
-                                if len(uuid_name) == 36 and uuid_name.count('-') == 4:  # Verificar que es UUID válido
-                                    dest_uuid_dir = extract_to / uuid_name
-                                    dest_uuid_dir.mkdir(exist_ok=True)
-                                    logger.info(f"📁 Created UUID directory in root: {uuid_name}")
-                                    
-                                    # Mover todos los archivos .bin al directorio UUID en la raíz
-                                    for bin_file in bin_files:
-                                        dest_file = dest_uuid_dir / bin_file.name
-                                        if dest_file.exists():
-                                            dest_file.unlink()
-                                            logger.info(f"🗑️ Removed existing file: {bin_file.name}")
-                                        
-                                        shutil.move(str(bin_file), str(dest_file))
-                                        logger.info(f"✅ Moved {bin_file.name} to UUID directory")
-                                else:
-                                    logger.warning(f"⚠️ Invalid UUID format: {uuid_name}")
-                            else:
-                                logger.info("ℹ️ No .bin files found to move")
-                        
-                        # Limpiar directorios temporales vacíos - versión mejorada
-                        for temp_name in ['embeddings', 'chroma']:
-                            temp_path = extract_to / temp_name
-                            if temp_path.exists() and temp_path.is_dir():
-                                try:
-                                    # Verificar si está vacío recursivamente
-                                    remaining_files = list(temp_path.rglob("*"))
-                                    if not remaining_files:
-                                        shutil.rmtree(temp_path)
-                                        logger.info(f"✅ Cleaned up empty directory: {temp_name}")
-                                    else:
-                                        logger.info(f"⚠️ Directory {temp_name} still has {len(remaining_files)} items, skipping cleanup")
-                                except Exception as e:
-                                    logger.warning(f"⚠️ Could not clean up {temp_name}: {e}")
-                    else:
-                        logger.info("✅ Files already in correct location, no moving needed")
-                else:
-                    logger.warning("❌ No chroma.sqlite3 file found in extracted content")
-                    # Log para debug: mostrar todos los archivos encontrados
-                    all_files = list(extract_to.rglob("*"))
-                    logger.info(f"🔍 All files found in extraction: {[str(f) for f in all_files if f.is_file()]}")
-                
-                # Log estado final
-                final_files = []
-                for item in extract_to.iterdir():
-                    if item.is_file():
-                        final_files.append(item.name)
-                    elif item.is_dir():
-                        final_files.append(f"{item.name}/")
-                
-                logger.info(f"📁 Final items in extract directory: {final_files}")
-                
-                # DEBUG: Verificar el estado final más detalladamente
-                logger.info("🔍 FINAL DEBUG - Checking file structure:")
-                for item in extract_to.iterdir():
-                    if item.is_file():
-                        logger.info(f"📄 FILE: {item.name} (size: {item.stat().st_size} bytes)")
-                    elif item.is_dir():
-                        logger.info(f"📁 DIR: {item.name}/")
-                        # Listar contenido de subdirectorios también
-                        for subitem in item.iterdir():
-                            if subitem.is_file():
-                                logger.info(f"  📄 SUBFILE: {subitem.name}")
-                            elif subitem.is_dir():
-                                logger.info(f"  📁 SUBDIR: {subitem.name}/")
-
-                # Verificar específicamente si chroma.sqlite3 está en la raíz
-                sqlite_in_root = extract_to / 'chroma.sqlite3'
-                logger.info(f"🎯 chroma.sqlite3 in root? {sqlite_in_root.exists()}")
-                if sqlite_in_root.exists():
-                    logger.info(f"✅ ROOT SQLITE SIZE: {sqlite_in_root.stat().st_size} bytes")
-
-                # Verificar si hay directorios UUID en la raíz
-                uuid_in_root = [d for d in extract_to.iterdir() if d.is_dir() and len(d.name) == 36]
-                logger.info(f"🔑 UUID directories in root: {[d.name for d in uuid_in_root]}")
+                # Verificar y mover archivos si es necesario
+                self._verify_and_organize_files(extract_to)
         
         # Run in thread to avoid blocking
         await asyncio.to_thread(extract)
+    
+    def _verify_and_organize_files(self, extract_to: Path):
+        """Verificar y organizar archivos extraídos"""
+        # Verificar si chroma.sqlite3 está en la raíz
+        sqlite_in_root = extract_to / 'chroma.sqlite3'
+        
+        if sqlite_in_root.exists():
+            logger.info("✅ chroma.sqlite3 found in root - structure is correct")
+        else:
+            # Buscar chroma.sqlite3 en subdirectorios y mover
+            logger.info("🔍 Searching for chroma.sqlite3 in subdirectories...")
+            
+            for sqlite_file in extract_to.rglob("chroma.sqlite3"):
+                if sqlite_file.parent != extract_to:
+                    # Mover a la raíz
+                    dest = extract_to / "chroma.sqlite3"
+                    shutil.move(str(sqlite_file), str(dest))
+                    logger.info(f"✅ Moved chroma.sqlite3 to root from {sqlite_file.parent}")
+                    break
+        
+        # Verificar directorios UUID
+        uuid_dirs_in_root = [
+            d for d in extract_to.iterdir() 
+            if d.is_dir() and len(d.name) == 36 and d.name.count('-') == 4
+        ]
+        
+        if uuid_dirs_in_root:
+            logger.info(f"✅ UUID directories in root: {[d.name for d in uuid_dirs_in_root]}")
+        else:
+            # Buscar directorios UUID en subdirectorios y mover
+            logger.info("🔍 Searching for UUID directories...")
+            
+            for uuid_dir in extract_to.rglob("*"):
+                if (uuid_dir.is_dir() and 
+                    len(uuid_dir.name) == 36 and 
+                    uuid_dir.name.count('-') == 4 and
+                    uuid_dir.parent != extract_to):
+                    
+                    # Mover directorio completo a la raíz
+                    dest = extract_to / uuid_dir.name
+                    if dest.exists():
+                        shutil.rmtree(dest)
+                    shutil.move(str(uuid_dir), str(dest))
+                    logger.info(f"✅ Moved UUID directory {uuid_dir.name} to root")
+        
+        # Limpiar directorios temporales vacíos
+        for temp_dir in ["embeddings", "chroma"]:
+            temp_path = extract_to / temp_dir
+            if temp_path.exists() and temp_path.is_dir():
+                try:
+                    if not any(temp_path.iterdir()):  # Si está vacío
+                        shutil.rmtree(temp_path)
+                        logger.info(f"🗑️ Cleaned up empty directory: {temp_dir}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not clean up {temp_dir}: {e}")
+        
+        # Log estado final
+        logger.info("🔍 Final structure verification:")
+        
+        sqlite_exists = (extract_to / "chroma.sqlite3").exists()
+        logger.info(f"🎯 chroma.sqlite3 in root: {sqlite_exists}")
+        
+        uuid_dirs = [
+            d.name for d in extract_to.iterdir() 
+            if d.is_dir() and len(d.name) == 36 and d.name.count('-') == 4
+        ]
+        logger.info(f"🔑 UUID directories in root: {uuid_dirs}")
     
     async def _extract_tar(self, tar_path: Path, extract_to: Path):
         """Extract TAR.GZ file"""
@@ -414,7 +286,7 @@ class GitHubEmbeddingsDownloader:
             "target_directory": str(self.settings.chroma_persist_dir)
         }
 
-# Helper function for easy integration
+# ✅ CORREGIDO: Función helper actualizada
 async def ensure_embeddings_available(settings) -> bool:
     """
     Ensure embeddings are available, download if necessary
