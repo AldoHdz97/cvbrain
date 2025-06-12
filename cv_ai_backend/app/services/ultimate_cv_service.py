@@ -1,5 +1,5 @@
 """
-Ultimate CV Service Integration v3.0
+Ultimate CV Service Integration v3.0 - CORREGIDO
 Combines all advanced components into production-ready service
 """
 
@@ -9,19 +9,16 @@ import time
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 
-
 from app.core.config import get_settings
 from app.models.schemas import (
     UltimateQueryRequest, UltimateQueryResponse, QueryType, 
     ConfidenceLevel, ResponseFormat, QueryComplexity
-
 )
 from app.utils.connection_manager import UltimateConnectionManager
 from app.utils.caching_system import UltimateCacheSystem, CacheBackend
 from app.utils.chromadb_manager import UltimateChromaDBManager
 from app.utils.rate_limiter import UltimateRateLimiter
-
-from app.utils.github_embeddings_downloader import ensure_embeddings_available
+from app.utils.github_embeddings_downloader import GitHubEmbeddingsDownloader
 
 logger = logging.getLogger(__name__)
 
@@ -76,9 +73,10 @@ class UltimateCVService:
         try:
             logger.info("🚀 Initializing Ultimate CV Service...")
 
-            # STEP 1: Ensure embeddings are available FIRST
+            # STEP 1: Ensure embeddings are available FIRST - CORREGIDO
             logger.info("🔍 Checking embeddings availability...")
-            embeddings_ready = await ensure_embeddings_available(self.settings)
+            downloader = GitHubEmbeddingsDownloader(self.settings)
+            embeddings_ready = await downloader.download_and_extract()
 
             if not embeddings_ready:
                 logger.error("❌ Failed to ensure embeddings availability")
@@ -101,7 +99,7 @@ class UltimateCVService:
             # STEP 4: Verify ChromaDB has data
             try:
                 collection_stats = self.chromadb_manager.get_stats()
-                document_count = collection_stats.get("total_documents", 0)
+                document_count = collection_stats.get("document_count", 0)
                 
                 if document_count > 0:
                     logger.info(f"✅ ChromaDB loaded successfully with {document_count} documents")
@@ -196,6 +194,10 @@ class UltimateCVService:
                 request.question, context, request.query_type, request.response_format
             )
 
+            # CORREGIDO: Usar temperatura y max_tokens correctamente
+            temperature = request.temperature_override or self.settings.openai_temperature
+            max_tokens = request.max_response_length or self.settings.openai_max_tokens
+
             ai_response = await openai_client.chat.completions.create(
                 model=self.settings.openai_model,
                 messages=[
@@ -205,8 +207,8 @@ class UltimateCVService:
                     },
                     {"role": "user", "content": prompt}
                 ],
-                temperature=request.temperature_override or self.settings.openai_temperature,
-                max_tokens=request.max_response_length or self.settings.openai_max_tokens,
+                temperature=temperature,
+                max_tokens=max_tokens,
                 top_p=0.9,
                 frequency_penalty=0.1,
                 presence_penalty=0.1
@@ -239,8 +241,8 @@ class UltimateCVService:
                 },
                 model_used=self.settings.openai_model,
                 model_parameters={
-                    "temperature": request.temperature_override or self.settings.openai_temperature,
-                    "max_tokens": request.max_response_length or self.settings.openai_max_tokens
+                    "temperature": temperature,
+                    "max_tokens": max_tokens
                 },
                 tokens_used=ai_response.usage.total_tokens if hasattr(ai_response, 'usage') else None,
                 response_format=request.response_format,
@@ -434,6 +436,14 @@ SUMMARY FOCUS - Complete professional picture:
 - Show personality, passion, and future aspirations
 - Include key achievements that demonstrate impact
 - Connect technical skills to business outcomes
+            """,
+            QueryType.TECHNICAL: """
+TECHNICAL FOCUS - Deep technical expertise:
+- Detail specific technologies, frameworks, and programming languages
+- Explain technical implementations and architectural decisions
+- Include performance metrics and optimization achievements
+- Highlight problem-solving approaches and technical innovations
+- Show progression in technical complexity and leadership
             """
         }
 
