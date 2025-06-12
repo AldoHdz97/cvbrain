@@ -1,5 +1,5 @@
 """
-CV-AI Backend Ultimate Data Models v3.0
+CV-AI Backend Ultimate Data Models v3.0 - COMPLETO Y CORREGIDO
 Latest Pydantic v2 patterns with comprehensive validation and security
 
 FEATURES:
@@ -65,7 +65,7 @@ class QueryType(str, Enum):
     LANGUAGES = "languages"
     TOOLS = "tools"
     METHODOLOGIES = "methodologies"
-    TECHNICAL = "technical"  # ✅ ADD THIS LINE
+    TECHNICAL = "technical"  # ✅ CORREGIDO: Agregado
 
     # Meta types
     GENERAL = "general"
@@ -107,7 +107,7 @@ class UltimateBaseModel(BaseModel):
     )
 
 class UltimateQueryRequest(UltimateBaseModel):
-    """SIMPLIFIED Query Request with required request_id"""
+    """CORREGIDO - Query Request con todos los campos necesarios"""
     
     question: Annotated[str, StringConstraints(
         min_length=3,
@@ -122,13 +122,21 @@ class UltimateQueryRequest(UltimateBaseModel):
     )
     
     # Optional fields with defaults
-    k: Optional[int] = Field(default=3)
+    k: Optional[int] = Field(default=3, ge=1, le=20)
     query_type: Optional[QueryType] = Field(default=None)
     response_format: Optional[ResponseFormat] = Field(default=ResponseFormat.DETAILED)
     include_sources: Optional[bool] = Field(default=True)
     include_confidence_explanation: Optional[bool] = Field(default=False)
     language: Optional[str] = Field(default="en")
-    max_response_length: Optional[int] = Field(default=800)
+    max_response_length: Optional[int] = Field(default=800, ge=100, le=4000)
+    
+    # ✅ CORREGIDO: Campos faltantes agregados
+    temperature_override: Optional[float] = Field(
+        default=None, 
+        ge=0.0, 
+        le=2.0,
+        description="Override temperature for AI generation"
+    )
     
     @field_validator("question")
     @classmethod
@@ -152,8 +160,10 @@ class UltimateQueryRequest(UltimateBaseModel):
             return QueryComplexity.SIMPLE
         elif word_count <= 15:
             return QueryComplexity.MEDIUM
-        else:
+        elif word_count <= 30:
             return QueryComplexity.COMPLEX
+        else:
+            return QueryComplexity.VERY_COMPLEX
 
 class UltimateQueryResponse(UltimateBaseModel):
     """
