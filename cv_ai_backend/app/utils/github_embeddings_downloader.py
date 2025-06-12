@@ -290,16 +290,53 @@ class GitHubEmbeddingsDownloader:
                         
                         logger.info(f"📂 Found UUID directories to move: {[str(d) for d in uuid_dirs]}")
                         
-                        for uuid_dir in uuid_dirs:
-                            dest = extract_to / uuid_dir.name
-                            logger.info(f"📂 Moving UUID directory: {uuid_dir} -> {dest}")
+                        # Si encontramos directorios UUID, moverlos completos
+                        if uuid_dirs:
+                            for uuid_dir in uuid_dirs:
+                                dest = extract_to / uuid_dir.name
+                                logger.info(f"📂 Moving UUID directory: {uuid_dir} -> {dest}")
+                                
+                                if dest.exists():
+                                    shutil.rmtree(dest)
+                                    logger.info(f"🗑️ Removed existing directory: {dest}")
+                                
+                                shutil.move(str(uuid_dir), str(dest))
+                                logger.info(f"✅ Moved UUID directory: {uuid_dir.name}")
+                        else:
+                            # NUEVO: Si no encontramos directorios UUID, buscar archivos .bin individuales
+                            logger.info("🔍 No UUID directories found, searching for individual .bin files...")
                             
-                            if dest.exists():
-                                shutil.rmtree(dest)
-                                logger.info(f"🗑️ Removed existing directory: {dest}")
+                            bin_files = []
+                            for item in extract_to.rglob("*.bin"):
+                                if item.parent != extract_to:  # Solo si NO están en la raíz
+                                    bin_files.append(item)
                             
-                            shutil.move(str(uuid_dir), str(dest))
-                            logger.info(f"✅ Moved UUID directory: {uuid_dir.name}")
+                            logger.info(f"📄 Found .bin files to move: {[str(f) for f in bin_files]}")
+                            
+                            # Crear directorio UUID en la raíz basado en el nombre del directorio fuente
+                            if bin_files:
+                                # Obtener el UUID del primer archivo encontrado
+                                source_uuid_path = bin_files[0].parent
+                                uuid_name = source_uuid_path.name
+                                
+                                if len(uuid_name) == 36 and uuid_name.count('-') == 4:  # Verificar que es UUID válido
+                                    dest_uuid_dir = extract_to / uuid_name
+                                    dest_uuid_dir.mkdir(exist_ok=True)
+                                    logger.info(f"📁 Created UUID directory in root: {uuid_name}")
+                                    
+                                    # Mover todos los archivos .bin al directorio UUID en la raíz
+                                    for bin_file in bin_files:
+                                        dest_file = dest_uuid_dir / bin_file.name
+                                        if dest_file.exists():
+                                            dest_file.unlink()
+                                            logger.info(f"🗑️ Removed existing file: {bin_file.name}")
+                                        
+                                        shutil.move(str(bin_file), str(dest_file))
+                                        logger.info(f"✅ Moved {bin_file.name} to UUID directory")
+                                else:
+                                    logger.warning(f"⚠️ Invalid UUID format: {uuid_name}")
+                            else:
+                                logger.info("ℹ️ No .bin files found to move")
                         
                         # Limpiar directorios temporales vacíos - versión mejorada
                         for temp_name in ['embeddings', 'chroma']:
