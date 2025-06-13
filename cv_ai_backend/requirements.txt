@@ -2,7 +2,7 @@
 # Clean, minimal, and updated dependencies (December 2024)
 
 # Core FastAPI Stack
-fastapi==0.115.12                 # Latest stable version
+fastapi==0.115.9                 # Latest stable version
 uvicorn[standard]==0.32.1         # ASGI server
 pydantic==2.10.3                  # Stable version (avoiding 2.11.x performance issues)
 pydantic-settings==2.6.1          # Settings management
