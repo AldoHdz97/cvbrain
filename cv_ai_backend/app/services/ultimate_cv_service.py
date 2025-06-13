@@ -1,617 +1,240 @@
 """
-Ultimate CV Service Integration v3.0 - CORREGIDO
-Combines all advanced components into production-ready service
+CV Service - Core business logic
+Simplified and clean implementation
 """
 
 import asyncio
 import logging
 import time
-from typing import Dict, List, Optional, Any, Tuple
+import hashlib
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from app.core.config import get_settings
-from app.models.schemas import (
-    UltimateQueryRequest, UltimateQueryResponse, QueryType, 
-    ConfidenceLevel, ResponseFormat, QueryComplexity
-)
-from app.utils.connection_manager import UltimateConnectionManager
-from app.utils.caching_system import UltimateCacheSystem, CacheBackend
-from app.utils.chromadb_manager import UltimateChromaDBManager
-from app.utils.rate_limiter import UltimateRateLimiter
-from app.utils.github_embeddings_downloader import GitHubEmbeddingsDownloader
+import chromadb
+from openai import AsyncOpenAI
+
+from app.core.config import settings
+from app.models.schemas import QueryRequest, QueryResponse, QueryType
 
 logger = logging.getLogger(__name__)
 
-class UltimateCVService:
-    """
-    🔥 ULTIMATE CV SERVICE v3.0
-
-    Integrates all advanced components:
-    - Ultimate connection management with HTTP/2
-    - Multi-layer caching (Memory + Redis + Disk)
-    - Advanced ChromaDB operations
-    - AI-powered client profiling
-    - Comprehensive monitoring and metrics
-    """
-
+class CVService:
+    """Core CV query service"""
+    
     def __init__(self):
-        self.settings = get_settings()
         self._initialized = False
-
-        # Initialize core components first
-        self.connection_manager = UltimateConnectionManager(
-            max_connections=self.settings.openai_max_connections,
-            max_connection_age=3600,
-            max_idle_time=300,
-            health_check_interval=60
-        )
-
-        self.cache_system = UltimateCacheSystem(
-            backend=CacheBackend(self.settings.cache_backend),
-            memory_config={
-                "max_size": self.settings.memory_cache_size,
-                "default_ttl": self.settings.memory_cache_ttl
-            },
-            redis_config={
-                "url": self.settings.redis_url,
-                "default_ttl": 3600,
-                "max_connections": self.settings.redis_max_connections,
-                "retry_on_timeout": self.settings.redis_retry_on_timeout
-            } if self.settings.redis_url else None
-        )
-
-        # ChromaDB will be initialized AFTER embeddings are ready
-        self.chromadb_manager = None
-
-        # Service state
-        self._startup_time = datetime.utcnow()
-
-        logger.info(f"Ultimate CV Service initialized with all advanced components")
-
+        self._client: Optional[chromadb.ClientAPI] = None
+        self._collection = None
+        self._openai_client: Optional[AsyncOpenAI] = None
+        self._cache: Dict[str, QueryResponse] = {}
+        
     async def initialize(self) -> bool:
-        """Initialize all service components with proper embeddings flow"""
+        """Initialize the service"""
         try:
-            logger.info("🚀 Initializing Ultimate CV Service...")
-
-            # STEP 1: Ensure embeddings are available FIRST - CORREGIDO
-            logger.info("🔍 Checking embeddings availability...")
-            downloader = GitHubEmbeddingsDownloader(self.settings)
-            embeddings_ready = await downloader.download_and_extract()
-
-            if not embeddings_ready:
-                logger.error("❌ Failed to ensure embeddings availability")
-                logger.warning("⚠️ Continuing without verified embeddings...")
-
-            # STEP 2: Initialize cache system
-            cache_success = await self.cache_system.initialize()
-            if not cache_success:
-                logger.warning("Cache system initialization failed, continuing with memory only")
-
-            # STEP 3: Initialize ChromaDB AFTER embeddings are in place
-            logger.info("🔌 Initializing ChromaDB with embeddings...")
-            self.chromadb_manager = UltimateChromaDBManager(self.settings)
-            chromadb_success = await self.chromadb_manager.initialize()
+            logger.info("Initializing CV Service...")
             
-            if not chromadb_success:
-                logger.error("❌ ChromaDB initialization failed")
-                return False
-
-            # STEP 4: Verify ChromaDB has data
-            try:
-                collection_stats = self.chromadb_manager.get_stats()
-                document_count = collection_stats.get("document_count", 0)
-                
-                if document_count > 0:
-                    logger.info(f"✅ ChromaDB loaded successfully with {document_count} documents")
-                else:
-                    logger.warning("⚠️ ChromaDB initialized but no documents found - this may be normal for first run")
-                    
-            except Exception as e:
-                logger.warning(f"⚠️ Could not verify ChromaDB document count: {e}")
-
-            # STEP 5: Warm cache with common queries
-            await self._warm_cache()
-
-            self._initialized = True
-            logger.info("✅ Ultimate CV Service fully initialized")
-
-            return True
-
-        except Exception as e:
-            logger.error(f"❌ Ultimate CV Service initialization failed: {e}")
-            return False
-
-    async def query_cv(self, request: UltimateQueryRequest) -> UltimateQueryResponse:
-        """
-        🧠 ULTIMATE QUERY PROCESSING
-
-        Features:
-        - Multi-layer caching with intelligent cache warming
-        - Advanced embedding generation with connection pooling
-        - AI-powered confidence scoring
-        - Comprehensive performance tracking
-        """
-        start_time = time.time()
-
-        if not self._initialized:
-            raise Exception("Service not initialized")
-
-        if not self.chromadb_manager:
-            raise Exception("ChromaDB manager not initialized")
-
-        try:
-            # Check cache first (L1: Memory, L2: Redis, L3: Disk)
-            cache_key = f"query:{request.question_hash}"
-            cached_response = await self.cache_system.get(cache_key)
-
-            if cached_response:
-                logger.debug(f"🚀 Cache hit for query: {request.question[:50]}...")
-                cached_response.cache_hit = True
-                cached_response.processing_metrics["cache_retrieval_time"] = time.time() - start_time
-                return cached_response
-
-            # Generate embedding with ultimate connection management
-            embedding_start = time.time()
-            openai_client = await self.connection_manager.get_openai_client(self.settings)
-
-            embedding_response = await openai_client.embeddings.create(
-                model=self.settings.embedding_model,
-                input=request.question.strip(),
-                dimensions=self.settings.embedding_dimensions,
-                encoding_format="float"
+            # Initialize OpenAI client
+            self._openai_client = AsyncOpenAI(
+                api_key=settings.openai_api_key,
+                timeout=settings.openai_timeout
             )
-
+            
+            # Initialize ChromaDB
+            self._client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
+            
+            # Get or create collection
+            try:
+                self._collection = self._client.get_collection(
+                    name=settings.chroma_collection_name
+                )
+            except Exception:
+                logger.warning(f"Collection '{settings.chroma_collection_name}' not found")
+                return False
+            
+            # Check if collection has data
+            count = self._collection.count()
+            if count == 0:
+                logger.warning("Collection is empty - consider loading CV data")
+                return False
+            
+            logger.info(f"CV Service initialized with {count} documents")
+            self._initialized = True
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize CV Service: {e}")
+            return False
+    
+    async def query_cv(self, request: QueryRequest) -> QueryResponse:
+        """Process CV query"""
+        if not self._initialized:
+            raise RuntimeError("Service not initialized")
+        
+        start_time = time.time()
+        
+        try:
+            # Check cache first
+            cache_key = self._get_cache_key(request.question)
+            if settings.enable_caching and cache_key in self._cache:
+                cached_response = self._cache[cache_key]
+                cached_response.cache_hit = True
+                return cached_response
+            
+            # Generate embedding
+            embedding_response = await self._openai_client.embeddings.create(
+                model=settings.embedding_model,
+                input=request.question.strip()
+            )
             query_embedding = embedding_response.data[0].embedding
-            embedding_time = time.time() - embedding_start
-
-            # Search ChromaDB with advanced patterns
-            search_start = time.time()
-            search_results = await self.chromadb_manager.query_collection(
-                query_embedding=query_embedding,
-                k=request.k,
+            
+            # Search ChromaDB
+            results = self._collection.query(
+                query_embeddings=[query_embedding],
+                n_results=request.k,
                 include=['documents', 'distances', 'metadatas']
             )
-            search_time = time.time() - search_start
-
-            # Process results
-            documents = search_results['documents']
-            distances = search_results['distances']
-            metadatas = search_results['metadatas']
-
+            
+            documents = results['documents'][0] if results['documents'] else []
+            distances = results['distances'][0] if results['distances'] else []
+            
             if not documents:
                 return self._create_fallback_response(request, start_time)
-
-            # Calculate advanced confidence scores
-            similarity_scores = [round(1.0 / (1.0 + distance), 4) for distance in distances]
-            confidence_level, confidence_score = self._calculate_ultimate_confidence(
-                similarity_scores, documents, request
-            )
-
-            # Generate AI response with optimized prompting
-            ai_start = time.time()
-            context = self._create_optimized_context(documents, similarity_scores, request.query_type)
-            prompt = self._create_specialized_prompt(
-                request.question, context, request.query_type, request.response_format
-            )
-
-            # CORREGIDO: Usar temperatura y max_tokens correctamente
-            temperature = request.temperature_override or self.settings.openai_temperature
-            max_tokens = request.max_response_length or self.settings.openai_max_tokens
-
-            ai_response = await openai_client.chat.completions.create(
-                model=self.settings.openai_model,
+            
+            # Calculate similarity scores
+            similarity_scores = [1.0 / (1.0 + dist) for dist in distances]
+            
+            # Generate AI response
+            context = self._create_context(documents, similarity_scores)
+            prompt = self._create_prompt(request.question, context, request.query_type)
+            
+            ai_response = await self._openai_client.chat.completions.create(
+                model=settings.openai_model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are Aldo Hernández Villanueva, responding authentically about your professional background."
+                        "content": "You are Aldo Hernández Villanueva, responding about your professional background in first person."
                     },
                     {"role": "user", "content": prompt}
                 ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_p=0.9,
-                frequency_penalty=0.1,
-                presence_penalty=0.1
+                temperature=settings.openai_temperature,
+                max_tokens=request.max_response_length
             )
-
-            ai_time = time.time() - ai_start
+            
             answer = ai_response.choices[0].message.content
-
-            # Create comprehensive response
             processing_time = time.time() - start_time
-
-            response = UltimateQueryResponse(
-                request_id=request.request_id,
+            
+            # Create response
+            response = QueryResponse(
                 answer=answer,
-                query_type=request.query_type or QueryType.GENERAL,
-                query_complexity=request.complexity,
-                confidence_level=confidence_level,
-                confidence_score=confidence_score,
-                confidence_factors=self._get_confidence_factors(similarity_scores, documents),
+                query_type=request.query_type or self._classify_query(request.question),
                 relevant_chunks=len(documents),
                 similarity_scores=similarity_scores,
-                sources=[doc[:150] + "..." if len(doc) > 150 else doc for doc in documents],
-                source_metadata=metadatas,
-                processing_metrics={
-                    "total_time_seconds": round(processing_time, 4),
-                    "embedding_time": round(embedding_time, 4),
-                    "search_time": round(search_time, 4),
-                    "ai_generation_time": round(ai_time, 4),
-                    "cache_hit": False
-                },
-                model_used=self.settings.openai_model,
-                model_parameters={
-                    "temperature": temperature,
-                    "max_tokens": max_tokens
-                },
-                tokens_used=ai_response.usage.total_tokens if hasattr(ai_response, 'usage') else None,
-                response_format=request.response_format,
-                language=request.language,
-                quality_metrics=self._calculate_quality_metrics(answer, similarity_scores),
-                metadata={
-                    "service_version": self.settings.app_version,
-                    "processing_node": "ultimate_cv_service",
-                    "cache_backend": self.settings.cache_backend,
-                    "embedding_model": self.settings.embedding_model
-                }
+                sources=documents[:3] if request.include_sources else [],
+                processing_time=processing_time,
+                model_used=settings.openai_model
             )
-
-            # Cache the response for future requests
-            await self.cache_system.set(
-                cache_key, 
-                response, 
-                ttl=self.settings.query_cache_ttl
-            )
-
-            # Record performance metrics
-            await self.connection_manager.record_request(True, processing_time)
-
-            logger.info(f"✅ Ultimate query processed in {processing_time:.3f}s")
-
+            
+            # Cache response
+            if settings.enable_caching:
+                self._cache[cache_key] = response
+                # Simple cache cleanup
+                if len(self._cache) > 100:
+                    # Remove oldest entries
+                    keys_to_remove = list(self._cache.keys())[:20]
+                    for key in keys_to_remove:
+                        del self._cache[key]
+            
             return response
-
+            
         except Exception as e:
-            processing_time = time.time() - start_time
-            await self.connection_manager.record_request(False, processing_time)
-            logger.error(f"❌ Ultimate query processing failed: {e}")
+            logger.error(f"Query processing failed: {e}")
             raise
-
-    def _calculate_ultimate_confidence(
-        self, 
-        similarity_scores: List[float], 
-        documents: List[str], 
-        request: UltimateQueryRequest
-    ) -> Tuple[ConfidenceLevel, float]:
-        """Advanced multi-factor confidence calculation"""
-        if not similarity_scores:
-            return ConfidenceLevel.VERY_LOW, 0.0
-
-        # Factor 1: Semantic similarity (40% weight)
-        avg_similarity = sum(similarity_scores) / len(similarity_scores)
-        max_similarity = max(similarity_scores)
-
-        # Factor 2: Source diversity (25% weight)
-        source_diversity = min(len(documents) / 5.0, 1.0)
-
-        # Factor 3: Query complexity alignment (20% weight)
-        complexity_alignment = self._assess_complexity_alignment(request.complexity, documents)
-
-        # Factor 4: Content relevance (15% weight)
-        content_relevance = self._assess_content_relevance(request.question, documents)
-
-        # Calculate weighted score
-        confidence_score = (
-            avg_similarity * 0.4 +
-            source_diversity * 0.25 +
-            complexity_alignment * 0.2 +
-            content_relevance * 0.15
-        )
-
-        # Determine confidence level
-        if confidence_score >= 0.9:
-            level = ConfidenceLevel.VERY_HIGH
-        elif confidence_score >= 0.8:
-            level = ConfidenceLevel.HIGH
-        elif confidence_score >= 0.65:
-            level = ConfidenceLevel.MEDIUM
-        elif confidence_score >= 0.5:
-            level = ConfidenceLevel.LOW
+    
+    def _get_cache_key(self, question: str) -> str:
+        """Generate cache key for question"""
+        return hashlib.md5(question.lower().encode()).hexdigest()
+    
+    def _classify_query(self, question: str) -> QueryType:
+        """Simple query classification"""
+        question_lower = question.lower()
+        
+        if any(word in question_lower for word in ['skill', 'technology', 'programming', 'language', 'tool']):
+            return QueryType.SKILLS
+        elif any(word in question_lower for word in ['experience', 'work', 'job', 'company', 'role']):
+            return QueryType.EXPERIENCE
+        elif any(word in question_lower for word in ['education', 'degree', 'university', 'study']):
+            return QueryType.EDUCATION
+        elif any(word in question_lower for word in ['project', 'built', 'created', 'developed']):
+            return QueryType.PROJECTS
+        elif any(word in question_lower for word in ['contact', 'email', 'phone', 'linkedin']):
+            return QueryType.CONTACT
+        elif any(word in question_lower for word in ['summary', 'about', 'who', 'overview']):
+            return QueryType.SUMMARY
         else:
-            level = ConfidenceLevel.VERY_LOW
-
-        return level, round(confidence_score, 4)
-
-    def _assess_complexity_alignment(self, complexity: QueryComplexity, documents: List[str]) -> float:
-        """Assess how well documents match query complexity"""
-        if complexity == QueryComplexity.SIMPLE:
-            return 0.8  # Simple queries usually get good answers
-        elif complexity == QueryComplexity.MEDIUM:
-            return 0.9 if len(documents) >= 3 else 0.7
-        elif complexity == QueryComplexity.COMPLEX:
-            return 0.9 if len(documents) >= 5 else 0.6
-        else:  # VERY_COMPLEX
-            return 0.8 if len(documents) >= 7 else 0.5
-
-    def _assess_content_relevance(self, question: str, documents: List[str]) -> float:
-        """Basic content relevance assessment"""
-        question_words = set(question.lower().split())
-
-        relevance_scores = []
-        for doc in documents:
-            doc_words = set(doc.lower().split())
-            overlap = len(question_words & doc_words)
-            relevance = overlap / max(len(question_words), 1)
-            relevance_scores.append(relevance)
-
-        return sum(relevance_scores) / max(len(relevance_scores), 1)
-
-    def _get_confidence_factors(self, similarity_scores: List[float], documents: List[str]) -> Dict[str, float]:
-        """Get detailed confidence factors breakdown"""
-        if not similarity_scores:
-            return {}
-
-        return {
-            "semantic_similarity": round(sum(similarity_scores) / len(similarity_scores), 4),
-            "source_diversity": round(min(len(documents) / 5.0, 1.0), 4),
-            "content_completeness": round(min(len(documents) / 3.0, 1.0), 4),
-            "max_similarity": round(max(similarity_scores), 4)
-        }
-
-    def _create_optimized_context(self, documents: List[str], scores: List[float], query_type: Optional[QueryType]) -> str:
-        """Create optimized context based on query type"""
+            return QueryType.GENERAL
+    
+    def _create_context(self, documents: List[str], scores: List[float]) -> str:
+        """Create context from documents"""
         context_parts = []
-
         for i, (doc, score) in enumerate(zip(documents, scores)):
-            # Add relevance-based formatting
-            relevance_label = "🔥 HIGH" if score > 0.8 else "⚡ MEDIUM" if score > 0.6 else "📝 LOW"
-            header = f"Context {i+1} ({relevance_label} relevance: {score:.3f}):"
+            # Truncate long documents
+            if len(doc) > 400:
+                doc = doc[:400] + "..."
+            context_parts.append(f"Context {i+1} (relevance: {score:.3f}):\n{doc}")
+        
+        return "\n\n".join(context_parts)
+    
+    def _create_prompt(self, question: str, context: str, query_type: Optional[QueryType]) -> str:
+        """Create AI prompt"""
+        base_prompt = """
+Answer the following question about my professional background based on the provided context.
+Respond in first person as Aldo Hernández Villanueva.
+Be specific, professional, and engaging.
+If the context doesn't contain enough information, say so politely.
 
-            # Smart truncation based on relevance
-            max_length = 600 if score > 0.8 else 400 if score > 0.6 else 200
-            if len(doc) > max_length:
-                doc = doc[:max_length-3] + "..."
-
-            context_parts.append(f"{header}\n{doc}")
-
-        return "\n\n---\n\n".join(context_parts)
-
-    def _create_specialized_prompt(
-        self, 
-        question: str, 
-        context: str, 
-        query_type: Optional[QueryType], 
-        response_format: ResponseFormat
-    ) -> str:
-        """Create specialized prompts based on query analysis"""
-
-        base_instructions = """
-You are Aldo Hernández Villanueva, a charismatic Mexican economist with strong technical expertise.
-Respond authentically and professionally about your background, always in first person.
-
-CRITICAL GUIDELINES:
-- Answer based ONLY on the provided context from your resume
-- Be specific with details: technologies, companies, dates, achievements
-- If context lacks information, say "I don't have that specific information readily available"
-- Include concrete examples and quantifiable results when possible
-- Show your personality - be enthusiastic and engaging
-        """
-
-        # Query-type specific instructions
-        type_instructions = {
-            QueryType.SKILLS: """
-SKILLS FOCUS - Be comprehensive and organized:
-- List specific technologies, programming languages, and tools
-- Mention proficiency levels and years of experience where available  
-- Organize by categories (programming, data analysis, business skills)
-- Include both technical and soft skills
-- Highlight unique combinations or specializations
-            """,
-            QueryType.EXPERIENCE: """
-EXPERIENCE FOCUS - Show your career journey:
-- Highlight specific roles, companies, and time periods
-- Emphasize key responsibilities and quantifiable achievements
-- Show career progression and growth trajectory
-- Include impact on business outcomes and team collaboration
-- Mention leadership examples and cross-functional work
-            """,
-            QueryType.EDUCATION: """
-EDUCATION FOCUS - Academic and continuous learning:
-- Include degrees, institutions, and graduation years
-- Mention relevant coursework and academic projects
-- Include certifications and continuous learning initiatives
-- Connect education to practical applications in your career
-            """,
-            QueryType.PROJECTS: """
-PROJECTS FOCUS - Technical accomplishments:
-- Describe specific projects with technologies and frameworks used
-- Explain your role and key contributions to each project
-- Highlight outcomes, impact, and lessons learned
-- Include technical challenges overcome and innovations implemented
-- Show problem-solving and technical leadership
-            """,
-            QueryType.SUMMARY: """
-SUMMARY FOCUS - Complete professional picture:
-- Provide comprehensive professional overview balancing technical and business
-- Highlight unique value proposition and career highlights
-- Show personality, passion, and future aspirations
-- Include key achievements that demonstrate impact
-- Connect technical skills to business outcomes
-            """,
-            QueryType.TECHNICAL: """
-TECHNICAL FOCUS - Deep technical expertise:
-- Detail specific technologies, frameworks, and programming languages
-- Explain technical implementations and architectural decisions
-- Include performance metrics and optimization achievements
-- Highlight problem-solving approaches and technical innovations
-- Show progression in technical complexity and leadership
-            """
-        }
-
-        type_instruction = type_instructions.get(query_type, "") if query_type else ""
-
-        # Format-specific adjustments
-        format_instruction = ""
-        if response_format == ResponseFormat.BULLET_POINTS:
-            format_instruction = "\nFormat your response using clear bullet points for better readability."
-        elif response_format == ResponseFormat.TECHNICAL:
-            format_instruction = "\nFocus on technical details, specific technologies, and implementation approaches."
-        elif response_format == ResponseFormat.SUMMARY:
-            format_instruction = "\nProvide a concise but comprehensive summary."
-
-        return f"""{base_instructions}
-
-{type_instruction}
-
-{format_instruction}
-
-Resume Context:
+Context:
 {context}
 
 Question: {question}
 
-My Response:"""
-
-    def _calculate_quality_metrics(self, answer: str, similarity_scores: List[float]) -> Dict[str, Any]:
-        """Calculate response quality metrics"""
-        return {
-            "answer_length": len(answer),
-            "word_count": len(answer.split()),
-            "avg_similarity": round(sum(similarity_scores) / max(len(similarity_scores), 1), 4),
-            "source_count": len(similarity_scores),
-            "completeness_score": min(len(answer) / 200, 1.0)  # Optimal around 200 chars
-        }
-
-    def _create_fallback_response(self, request: UltimateQueryRequest, start_time: float) -> UltimateQueryResponse:
+Answer:
+"""
+        return base_prompt.format(context=context, question=question)
+    
+    def _create_fallback_response(self, request: QueryRequest, start_time: float) -> QueryResponse:
         """Create fallback response when no relevant content found"""
-        return UltimateQueryResponse(
-            request_id=request.request_id,
-            answer="I apologize, but I don't have enough relevant information in my knowledge base to answer that specific question. Could you try rephrasing your question or asking about something else related to my professional background?",
+        return QueryResponse(
+            answer="I don't have enough relevant information to answer that specific question. Could you try asking about something else related to my professional background?",
             query_type=request.query_type or QueryType.GENERAL,
-            query_complexity=request.complexity,
-            confidence_level=ConfidenceLevel.VERY_LOW,
-            confidence_score=0.0,
-            confidence_factors={},
             relevant_chunks=0,
             similarity_scores=[],
             sources=[],
-            source_metadata=[],
-            processing_metrics={
-                "total_time_seconds": round(time.time() - start_time, 4),
-                "cache_hit": False
-            },
-            model_used=self.settings.openai_model,
-            model_parameters={},
-            response_format=request.response_format,
-            language=request.language,
-            quality_metrics={
-                "fallback_response": True,
-                "reason": "no_relevant_content"
-            },
-            metadata={
-                "service_version": self.settings.app_version,
-                "fallback": True
-            }
+            processing_time=time.time() - start_time,
+            model_used=settings.openai_model
         )
-
-    async def _warm_cache(self):
-        """Intelligent cache warming with common queries"""
-        common_queries = [
-            "What are your main technical skills?",
-            "Tell me about your work experience",
-            "What programming languages do you know?",
-            "Describe your educational background"
-        ]
-
-        logger.info("🔥 Starting intelligent cache warming...")
-
-        for query in common_queries:
-            try:
-                # Create a simple request for cache warming
-                warm_request = UltimateQueryRequest(
-                    question=query,
-                    k=3,
-                    response_format=ResponseFormat.SUMMARY
-                )
-
-                # Process query to warm cache
-                await self.query_cv(warm_request)
-
-            except Exception as e:
-                logger.warning(f"Cache warming failed for '{query}': {e}")
-
-        logger.info("✅ Cache warming completed")
-
-    async def get_comprehensive_stats(self) -> Dict[str, Any]:
-        """Get comprehensive service statistics"""
-        uptime = (datetime.utcnow() - self._startup_time).total_seconds()
-
-        chromadb_stats = {}
-        if self.chromadb_manager:
-            try:
-                chromadb_stats = self.chromadb_manager.get_stats()
-            except Exception as e:
-                chromadb_stats = {"error": str(e)}
-
-        return {
-            "service_info": {
-                "name": "Ultimate CV Service",
-                "version": self.settings.app_version,
-                "uptime_seconds": round(uptime, 2),
-                "environment": self.settings.environment,
-                "initialized": self._initialized
-            },
-            "connection_manager": self.connection_manager.get_stats(),
-            "cache_system": await self.cache_system.get_comprehensive_stats(),
-            "chromadb_manager": chromadb_stats,
-            "performance": {
-                "avg_query_time": "< 2 seconds",
-                "cache_hit_rate": "85%+",
-                "memory_efficiency": "Optimized"
-            }
-        }
-
+    
     async def cleanup(self):
-        """Comprehensive cleanup of all service components"""
-        logger.info("🧹 Starting Ultimate CV Service cleanup...")
+        """Cleanup service resources"""
+        if self._openai_client:
+            await self._openai_client.close()
+        self._initialized = False
+        logger.info("CV Service cleanup completed")
 
-        try:
-            # Cleanup in reverse order of initialization
-            if self.chromadb_manager:
-                await self.chromadb_manager.cleanup()
-            await self.cache_system.cleanup()
-            await self.connection_manager.cleanup_all()
-
-            self._initialized = False
-            logger.info("✅ Ultimate CV Service cleanup completed")
-
-        except Exception as e:
-            logger.error(f"❌ Cleanup error: {e}")
-
-# Singleton pattern for service instance
-_ultimate_cv_service_instance: Optional[UltimateCVService] = None
+# Service singleton
+_service_instance: Optional[CVService] = None
 _service_lock = asyncio.Lock()
 
-async def get_ultimate_cv_service() -> UltimateCVService:
-    """Get or create Ultimate CV service singleton"""
-    global _ultimate_cv_service_instance
-
+async def get_cv_service() -> Optional[CVService]:
+    """Get or create CV service instance"""
+    global _service_instance
+    
     async with _service_lock:
-        if _ultimate_cv_service_instance is None:
-            service = UltimateCVService()
-            success = await service.initialize()
-
-            if not success:
+        if _service_instance is None:
+            service = CVService()
+            if await service.initialize():
+                _service_instance = service
+            else:
                 await service.cleanup()
-                raise Exception("Failed to initialize Ultimate CV Service")
-
-            _ultimate_cv_service_instance = service
-
-    return _ultimate_cv_service_instance
-
-async def cleanup_ultimate_cv_service():
-    """Cleanup Ultimate CV service singleton"""
-    global _ultimate_cv_service_instance
-
-    if _ultimate_cv_service_instance:
-        await _ultimate_cv_service_instance.cleanup()
-        _ultimate_cv_service_instance = None
+                return None
+    
+    return _service_instance
