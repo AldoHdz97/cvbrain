@@ -8,8 +8,8 @@ pydantic==2.10.3                  # Stable version (avoiding 2.11.x performance 
 pydantic-settings==2.6.1          # Settings management
 
 # AI & Vector Database
-openai==1.57.0                    # Latest stable
-chromadb==1.2.0                   # More stable than 1.0.11
+openai==1.56.2                    # Latest stable (as of Dec 2024)
+chromadb==1.0.12                  # Latest stable version (confirmed available)
 httpx==0.28.1                     # HTTP client
 
 # Core Dependencies
