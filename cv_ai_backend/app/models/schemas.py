@@ -106,38 +106,45 @@ class UltimateBaseModel(BaseModel):
         json_schema_extra={"additionalProperties": False}
     )
 
-class UltimateQueryRequest(UltimateBaseModel):
-    """CORREGIDO - Query Request con todos los campos necesarios"""
+class UltimateQueryRequest(BaseModel):
+    """Ultimate Query Request with all required and optional fields"""
     
     question: Annotated[str, StringConstraints(
         min_length=3,
         max_length=2000,
         strip_whitespace=True
     )] = Field(..., description="Question about Aldo's professional background")
-    
-    # Add back request_id - backend service needs this
+
     request_id: str = Field(
         default_factory=lambda: str(uuid4()),
-        description="Request identifier"
+        description="Unique request identifier"
     )
     
-    # Optional fields with defaults
-    k: Optional[int] = Field(default=3, ge=1, le=20)
+    session_id: Optional[str] = Field(
+        default=None,
+        description="Session identifier to maintain multi-turn context"
+    )
+
+    maintain_context: Optional[bool] = Field(
+        default=True,
+        description="Whether to maintain prior conversation context"
+    )
+
+    k: Optional[int] = Field(default=5, ge=1, le=20)
     query_type: Optional[QueryType] = Field(default=None)
     response_format: Optional[ResponseFormat] = Field(default=ResponseFormat.DETAILED)
     include_sources: Optional[bool] = Field(default=True)
     include_confidence_explanation: Optional[bool] = Field(default=False)
     language: Optional[str] = Field(default="en")
     max_response_length: Optional[int] = Field(default=800, ge=100, le=4000)
-    
-    # ✅ CORREGIDO: Campos faltantes agregados
+
     temperature_override: Optional[float] = Field(
-        default=None, 
-        ge=0.0, 
+        default=None,
+        ge=0.0,
         le=2.0,
         description="Override temperature for AI generation"
     )
-    
+
     @field_validator("question")
     @classmethod
     def validate_question_security(cls, v: str, info: ValidationInfo) -> str:
@@ -146,13 +153,13 @@ class UltimateQueryRequest(UltimateBaseModel):
         if len(words) < 2:
             raise ValueError("Question must contain at least 2 meaningful words")
         return v
-    
+
     @computed_field
     @property
     def question_hash(self) -> str:
         return hashlib.md5(self.question.encode()).hexdigest()[:16]
-    
-    @computed_field  
+
+    @computed_field
     @property
     def complexity(self) -> QueryComplexity:
         word_count = len(self.question.split())
