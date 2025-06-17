@@ -101,41 +101,6 @@ class ConversationManager:
                 self.sessions = sessions_to_keep
                 logger.info(f"Cleaned up old conversation sessions. Active sessions: {len(self.sessions)}")
 
-class UltimateCVService:
-    def __init__(self):
-        self.settings = get_settings()
-        self._initialized = False
-        self.connection_manager = UltimateConnectionManager(
-            max_connections=self.settings.openai_max_connections,
-            max_connection_age=3600,
-            max_idle_time=300,
-            health_check_interval=60
-        )
-        self.cache_system = UltimateCacheSystem(
-            backend=CacheBackend(self.settings.cache_backend),
-            memory_config={
-                "max_size": self.settings.memory_cache_size,
-                "default_ttl": self.settings.memory_cache_ttl
-            },
-            redis_config={
-                "url": self.settings.redis_url,
-                "default_ttl": 3600,
-                "max_connections": self.settings.redis_max_connections,
-                "retry_on_timeout": self.settings.redis_retry_on_timeout
-            } if self.settings.redis_url else None
-        )
-        self.chromadb_manager = None
-        self.conversation_manager = ConversationManager(max_sessions=200)
-        self._conversation_enabled = True
-        self._startup_time = datetime.utcnow()
-        logger.info(f"Ultimate CV Service initialized with simplified conversational capabilities")
-
-    def verify_document_types(self, documents: List[Any]) -> List[str]:
-        issues = []
-        for i, doc in enumerate(documents):
-            if not isinstance(doc, str):
-                issues.append(f"Invalid type at index {i}: {type(doc)} → {repr(doc)[:100]}")
-        return issues
 # ===================================================================
 # CLASE PRINCIPAL SIMPLIFICADA
 # ===================================================================
@@ -501,7 +466,10 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 confidence_factors=self._get_confidence_factors(similarity_scores, documents),
                 relevant_chunks=len(documents),
                 similarity_scores=similarity_scores,
-                sources=[doc[:150] + "..." if len(doc) > 150 else doc for doc in documents],
+                sources=[
+                    doc[:150] + "..." if isinstance(doc, str) and len(doc) > 150 else doc
+                    for doc in documents if isinstance(doc, str)
+                ]
                 source_metadata=metadatas,
                 processing_metrics={
                     "total_time_seconds": round(processing_time, 4),
