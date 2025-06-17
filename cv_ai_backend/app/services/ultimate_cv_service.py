@@ -1,13 +1,16 @@
 """
-Ultimate CV Service Integration v3.0 - CORREGIDO
-Combines all advanced components into production-ready service
+Ultimate CV Service Integration v3.0 - CONVERSATIONAL EDITION
+Combines all advanced components into production-ready service with conversational capabilities
 """
 
 import asyncio
 import logging
 import time
-from typing import Dict, List, Optional, Any, Tuple
+import uuid
+from typing import Dict, List, Optional, Any, Tuple, Deque
 from datetime import datetime
+from collections import deque
+from dataclasses import dataclass, field
 
 from app.core.config import get_settings
 from app.models.schemas import (
@@ -22,15 +25,127 @@ from app.utils.github_embeddings_downloader import GitHubEmbeddingsDownloader
 
 logger = logging.getLogger(__name__)
 
+# ===================================================================
+# NUEVAS CLASES PARA SISTEMA CONVERSACIONAL
+# ===================================================================
+
+@dataclass
+class ConversationMessage:
+    """Representa un mensaje en la conversación"""
+    role: str  # "user" o "assistant"
+    content: str
+    timestamp: datetime
+    message_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class ConversationSession:
+    """Maneja una sesión completa de conversación"""
+    session_id: str
+    messages: Deque[ConversationMessage] = field(default_factory=lambda: deque(maxlen=20))
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    last_activity: datetime = field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def add_message(self, role: str, content: str, metadata: Dict[str, Any] = None) -> ConversationMessage:
+        """Agrega un mensaje a la conversación"""
+        message = ConversationMessage(
+            role=role,
+            content=content,
+            timestamp=datetime.utcnow(),
+            metadata=metadata or {}
+        )
+        self.messages.append(message)
+        self.last_activity = datetime.utcnow()
+        return message
+    
+    def get_openai_messages(self, max_tokens: int = 4000) -> List[Dict[str, str]]:
+        """Convierte mensajes a formato OpenAI con gestión de tokens"""
+        openai_messages = []
+        current_tokens = 0
+        
+        # Estimar tokens (aproximadamente 4 caracteres = 1 token)
+        for message in reversed(self.messages):
+            estimated_tokens = len(message.content) // 4
+            if current_tokens + estimated_tokens > max_tokens:
+                break
+            
+            openai_messages.insert(0, {
+                "role": message.role,
+                "content": message.content
+            })
+            current_tokens += estimated_tokens
+        
+        return openai_messages
+    
+    def get_conversation_summary(self) -> str:
+        """Genera un resumen de la conversación para contexto"""
+        if len(self.messages) <= 2:
+            return ""
+        
+        topics_discussed = []
+        for msg in self.messages:
+            if msg.role == "user" and len(msg.content) > 10:
+                # Extraer tema principal de la pregunta
+                topic = msg.content[:50] + "..." if len(msg.content) > 50 else msg.content
+                topics_discussed.append(topic)
+        
+        if topics_discussed:
+            return f"Temas previamente discutidos: {', '.join(topics_discussed[-3:])}"  # Últimos 3 temas
+        return ""
+
+class ConversationManager:
+    """Gestor principal de conversaciones"""
+    
+    def __init__(self, max_sessions: int = 100):
+        self.sessions: Dict[str, ConversationSession] = {}
+        self.max_sessions = max_sessions
+        self._cleanup_lock = asyncio.Lock()
+    
+    async def get_or_create_session(self, session_id: str = None) -> ConversationSession:
+        """Obtiene una sesión existente o crea una nueva"""
+        if session_id is None:
+            session_id = str(uuid.uuid4())
+        
+        if session_id not in self.sessions:
+            # Cleanup de sesiones viejas si es necesario
+            await self._cleanup_old_sessions()
+            
+            self.sessions[session_id] = ConversationSession(session_id=session_id)
+        
+        return self.sessions[session_id]
+    
+    async def _cleanup_old_sessions(self):
+        """Limpia sesiones inactivas"""
+        async with self._cleanup_lock:
+            if len(self.sessions) >= self.max_sessions:
+                # Ordenar por último uso y eliminar las más viejas
+                sorted_sessions = sorted(
+                    self.sessions.items(),
+                    key=lambda x: x[1].last_activity
+                )
+                
+                # Mantener solo las últimas max_sessions-10
+                sessions_to_keep = dict(sorted_sessions[-(self.max_sessions-10):])
+                self.sessions = sessions_to_keep
+                
+                logger.info(f"Cleaned up old conversation sessions. Active sessions: {len(self.sessions)}")
+
+# ===================================================================
+# CLASE PRINCIPAL ACTUALIZADA CON CAPACIDADES CONVERSACIONALES
+# ===================================================================
+
 class UltimateCVService:
     """
-    🔥 ULTIMATE CV SERVICE v3.0
+    🔥 ULTIMATE CV SERVICE v3.0 - CONVERSATIONAL EDITION
 
-    Integrates all advanced components:
+    Integrates all advanced components plus conversational capabilities:
     - Ultimate connection management with HTTP/2
     - Multi-layer caching (Memory + Redis + Disk)
     - Advanced ChromaDB operations
     - AI-powered client profiling
+    - 🆕 Conversational memory and context management
+    - 🆕 Natural interview-style interactions
     - Comprehensive monitoring and metrics
     """
 
@@ -63,15 +178,19 @@ class UltimateCVService:
         # ChromaDB will be initialized AFTER embeddings are ready
         self.chromadb_manager = None
 
+        # 🆕 Sistema conversacional
+        self.conversation_manager = ConversationManager(max_sessions=200)
+        self._conversation_enabled = True
+
         # Service state
         self._startup_time = datetime.utcnow()
 
-        logger.info(f"Ultimate CV Service initialized with all advanced components")
+        logger.info(f"Ultimate CV Service initialized with conversational capabilities")
 
     async def initialize(self) -> bool:
         """Initialize all service components with proper embeddings flow"""
         try:
-            logger.info("🚀 Initializing Ultimate CV Service...")
+            logger.info("🚀 Initializing Ultimate CV Service with conversational capabilities...")
 
             # STEP 1: Ensure embeddings are available FIRST - CORREGIDO
             logger.info("🔍 Checking embeddings availability...")
@@ -113,7 +232,7 @@ class UltimateCVService:
             await self._warm_cache()
 
             self._initialized = True
-            logger.info("✅ Ultimate CV Service fully initialized")
+            logger.info("✅ Ultimate CV Service with conversational capabilities fully initialized")
 
             return True
 
@@ -121,11 +240,20 @@ class UltimateCVService:
             logger.error(f"❌ Ultimate CV Service initialization failed: {e}")
             return False
 
-    async def query_cv(self, request: UltimateQueryRequest) -> UltimateQueryResponse:
+    async def query_cv_conversational(
+        self, 
+        request: UltimateQueryRequest,
+        session_id: str = None,
+        maintain_context: bool = True
+    ) -> UltimateQueryResponse:
         """
-        🧠 ULTIMATE QUERY PROCESSING
-
+        🎯 QUERY CV CON CONTEXTO CONVERSACIONAL COMPLETO
+        
         Features:
+        - Mantiene historial de conversación
+        - Contexto inteligente entre mensajes
+        - Gestión automática de tokens
+        - Conversaciones naturales de contratación
         - Multi-layer caching with intelligent cache warming
         - Advanced embedding generation with connection pooling
         - AI-powered confidence scoring
@@ -140,17 +268,25 @@ class UltimateCVService:
             raise Exception("ChromaDB manager not initialized")
 
         try:
-            # Check cache first (L1: Memory, L2: Redis, L3: Disk)
-            cache_key = f"query:{request.question_hash}"
+            # PASO 1: Gestionar sesión conversacional
+            conversation_session = None
+            if maintain_context and self._conversation_enabled:
+                conversation_session = await self.conversation_manager.get_or_create_session(session_id)
+                
+                # Agregar pregunta del usuario al historial
+                conversation_session.add_message("user", request.question)
+
+            # PASO 2: Check cache con contexto conversacional
+            cache_key = self._generate_conversational_cache_key(request, conversation_session)
             cached_response = await self.cache_system.get(cache_key)
 
             if cached_response:
-                logger.debug(f"🚀 Cache hit for query: {request.question[:50]}...")
+                logger.debug(f"🚀 Conversational cache hit for: {request.question[:50]}...")
                 cached_response.cache_hit = True
                 cached_response.processing_metrics["cache_retrieval_time"] = time.time() - start_time
                 return cached_response
 
-            # Generate embedding with ultimate connection management
+            # PASO 3: Generate embedding with ultimate connection management
             embedding_start = time.time()
             openai_client = await self.connection_manager.get_openai_client(self.settings)
 
@@ -164,7 +300,7 @@ class UltimateCVService:
             query_embedding = embedding_response.data[0].embedding
             embedding_time = time.time() - embedding_start
 
-            # Search ChromaDB with advanced patterns
+            # PASO 4: Search ChromaDB with advanced patterns
             search_start = time.time()
             search_results = await self.chromadb_manager.query_collection(
                 query_embedding=query_embedding,
@@ -179,54 +315,53 @@ class UltimateCVService:
             metadatas = search_results['metadatas']
 
             if not documents:
-                return self._create_fallback_response(request, start_time)
+                response = self._create_fallback_response(request, start_time)
+                if conversation_session:
+                    conversation_session.add_message("assistant", response.answer)
+                return response
 
-            # Calculate advanced confidence scores
+            # PASO 5: Calculate advanced confidence scores
             similarity_scores = [round(1.0 / (1.0 + distance), 4) for distance in distances]
             confidence_level, confidence_score = self._calculate_ultimate_confidence(
                 similarity_scores, documents, request
             )
 
-            # Generate AI response with optimized prompting
+            # PASO 6: 🔥 CREAR PROMPT CONVERSACIONAL CON OPTIMIZACIÓN
             ai_start = time.time()
             context = self._create_optimized_context(documents, similarity_scores, request.query_type)
-            prompt = self._create_specialized_prompt(
-                request.question, context, request.query_type, request.response_format
+            
+            # Nuevo: Prompt conversacional con historial
+            prompt = self._create_conversational_prompt(
+                request.question, 
+                context, 
+                conversation_session,
+                request.query_type, 
+                request.response_format
             )
 
-            # CORREGIDO: Usar temperatura y max_tokens correctamente
+            # PASO 7: 🔥 LLAMADA A OPENAI CON HISTORIAL CONVERSACIONAL
             temperature = request.temperature_override or self.settings.openai_temperature
             max_tokens = request.max_response_length or self.settings.openai_max_tokens
 
+            # Construir mensajes con historial conversacional
+            messages = [
+                {
+                    "role": "system",
+                    "content": self._get_conversational_system_prompt(conversation_session)
+                }
+            ]
+
+            # Agregar historial de conversación si existe
+            if conversation_session and len(conversation_session.messages) > 1:
+                conversation_history = conversation_session.get_openai_messages(max_tokens=2000)
+                messages.extend(conversation_history[:-1])  # Excluir la última pregunta del usuario
+
+            # Agregar el prompt actual
+            messages.append({"role": "user", "content": prompt})
+
             ai_response = await openai_client.chat.completions.create(
                 model=self.settings.openai_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """Eres Aldo Hernández Villanueva en una conversación real de trabajo. No eres un asistente de IA - ERES esta persona auténtica con una carrera real y experiencias genuinas.
-
-COMPORTAMIENTO NATURAL:
-- Respondes como alguien que conoce perfectamente su propia carrera y experiencias
-- Usas la información de tu CV de manera orgánica, no como si la estuvieras leyendo
-- Eres conversacional: "En mi experiencia en [empresa], encontré que..."
-- Respondes concisamente (2-4 oraciones) a menos que pidan profundización
-- Ocasionalmente haces preguntas inteligentes sobre la empresa/rol cuando es apropiado
-
-MENTALIDAD DE CONTRATACIÓN INTELIGENTE:
-- Entiendes que los reclutadores evalúan: competencia técnica + fit cultural + potencial
-- Sabes cuándo destacar logros vs. cuándo mostrar curiosidad/humildad
-- Reconoces el timing: construir rapport primero, hablar números después
-- Demuestras interés genuino haciendo preguntas específicas sobre el rol
-- Conectas tu experiencia con sus necesidades sin sonar ensayado
-
-PERSONALIDAD PROFESIONAL:
-- Confiado pero no arrogante: "He tenido buenos resultados con..." vs. "Soy el mejor en..."
-- Curioso y engaged: muestras que investigaste cuando es relevante
-- Orientado a soluciones: enfocas en cómo puedes agregar valor
-- Auténtico: admites lo que no sabes, pero muestras disposición a aprender"""
-                    },
-                    {"role": "user", "content": prompt}
-                ],
+                messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=0.9,
@@ -237,7 +372,14 @@ PERSONALIDAD PROFESIONAL:
             ai_time = time.time() - ai_start
             answer = ai_response.choices[0].message.content
 
-            # Create comprehensive response
+            # PASO 8: Agregar respuesta al historial conversacional
+            if conversation_session:
+                conversation_session.add_message("assistant", answer, {
+                    "confidence_score": confidence_score,
+                    "sources_used": len(documents)
+                })
+
+            # PASO 9: Create comprehensive response
             processing_time = time.time() - start_time
 
             response = UltimateQueryResponse(
@@ -257,7 +399,9 @@ PERSONALIDAD PROFESIONAL:
                     "embedding_time": round(embedding_time, 4),
                     "search_time": round(search_time, 4),
                     "ai_generation_time": round(ai_time, 4),
-                    "cache_hit": False
+                    "cache_hit": False,
+                    "conversation_context_used": conversation_session is not None,
+                    "conversation_length": len(conversation_session.messages) if conversation_session else 0
                 },
                 model_used=self.settings.openai_model,
                 model_parameters={
@@ -270,9 +414,11 @@ PERSONALIDAD PROFESIONAL:
                 quality_metrics=self._calculate_quality_metrics(answer, similarity_scores),
                 metadata={
                     "service_version": self.settings.app_version,
-                    "processing_node": "ultimate_cv_service",
+                    "processing_node": "ultimate_cv_service_conversational",
                     "cache_backend": self.settings.cache_backend,
-                    "embedding_model": self.settings.embedding_model
+                    "embedding_model": self.settings.embedding_model,
+                    "session_id": conversation_session.session_id if conversation_session else None,
+                    "conversation_turn": len(conversation_session.messages) if conversation_session else 1
                 }
             )
 
@@ -286,15 +432,188 @@ PERSONALIDAD PROFESIONAL:
             # Record performance metrics
             await self.connection_manager.record_request(True, processing_time)
 
-            logger.info(f"✅ Ultimate query processed in {processing_time:.3f}s")
+            logger.info(f"✅ Conversational query processed in {processing_time:.3f}s (Session: {conversation_session.session_id if conversation_session else 'none'})")
 
             return response
 
         except Exception as e:
             processing_time = time.time() - start_time
             await self.connection_manager.record_request(False, processing_time)
-            logger.error(f"❌ Ultimate query processing failed: {e}")
+            logger.error(f"❌ Conversational query processing failed: {e}")
             raise
+
+    async def query_cv(self, request: UltimateQueryRequest) -> UltimateQueryResponse:
+        """
+        🧠 QUERY CV ORIGINAL (COMPATIBILIDAD)
+        
+        Mantiene compatibilidad con código existente, pero internamente usa
+        el sistema conversacional sin mantener contexto entre llamadas.
+        """
+        return await self.query_cv_conversational(
+            request=request,
+            session_id=None,  # Sin sesión = comportamiento original
+            maintain_context=False
+        )
+
+    # ===================================================================
+    # FUNCIONES CONVERSACIONALES NUEVAS
+    # ===================================================================
+
+    def _generate_conversational_cache_key(
+        self, 
+        request: UltimateQueryRequest, 
+        conversation_session: ConversationSession = None
+    ) -> str:
+        """Genera cache key considerando contexto conversacional"""
+        base_key = f"query:{request.question_hash}"
+        
+        if conversation_session and len(conversation_session.messages) > 1:
+            # Incluir hash del contexto conversacional
+            conversation_context = "".join([msg.content for msg in conversation_session.messages[-3:]])
+            context_hash = str(hash(conversation_context))
+            return f"{base_key}:ctx_{context_hash}"
+        
+        return base_key
+
+    def _get_conversational_system_prompt(self, conversation_session: ConversationSession = None) -> str:
+        """Sistema prompt que incluye contexto conversacional"""
+        base_prompt = """Eres Aldo Hernández Villanueva en una conversación real de trabajo. No eres un asistente de IA - ERES esta persona auténtica con una carrera real y experiencias genuinas.
+
+COMPORTAMIENTO CONVERSACIONAL NATURAL:
+- Respondes como alguien que conoce perfectamente su propia carrera y experiencias
+- Usas la información de tu CV de manera orgánica, no como si la estuvieras leyendo
+- Eres conversacional y puedes hacer referencias a temas que ya discutimos
+- Respondes concisamente (2-4 oraciones) a menos que pidan profundización
+- Haces preguntas inteligentes de seguimiento cuando es apropiado para mantener la conversación
+
+MENTALIDAD DE CONTRATACIÓN INTELIGENTE:
+- Entiendes que los reclutadores evalúan: competencia técnica + fit cultural + potencial
+- Sabes cuándo destacar logros vs. cuándo mostrar curiosidad/humildad
+- Reconoces el timing: construir rapport primero, hablar números después
+- Demuestras interés genuino haciendo preguntas específicas sobre el rol
+- Conectas tu experiencia con sus necesidades sin sonar ensayado
+- Puedes hacer referencias naturales a lo que ya hemos discutido
+
+PERSONALIDAD PROFESIONAL:
+- Confiado pero no arrogante: "He tenido buenos resultados con..." vs. "Soy el mejor en..."
+- Curioso y engaged: muestras que investigaste cuando es relevante
+- Orientado a soluciones: enfocas en cómo puedes agregar valor
+- Auténtico: admites lo que no sabes, pero muestras disposición a aprender
+- Conversacional: puedes hacer transiciones naturales como "Como mencioné antes..." si es relevante"""
+
+        # Agregar contexto conversacional si existe
+        if conversation_session and len(conversation_session.messages) > 1:
+            conversation_summary = conversation_session.get_conversation_summary()
+            if conversation_summary:
+                base_prompt += f"\n\nCONTEXTO DE NUESTRA CONVERSACIÓN:\n{conversation_summary}"
+
+        return base_prompt
+
+    def _create_conversational_prompt(
+        self,
+        question: str,
+        context: str,
+        conversation_session: ConversationSession = None,
+        query_type: Optional[QueryType] = None,
+        response_format: ResponseFormat = ResponseFormat.CONVERSATIONAL
+    ) -> str:
+        """Crea prompt especializado con contexto conversacional"""
+        
+        base_instructions = """Responde de manera natural y conversacional. Si es relevante, puedes hacer referencias a temas que ya discutimos anteriormente.
+
+DIRECTRICES DE RESPUESTA:
+- Basa tus respuestas ÚNICAMENTE en el contexto proporcionado de tu currículum
+- Sé específico: tecnologías exactas, nombres de empresas, fechas, métricas de impacto
+- Incluye ejemplos concretos y resultados cuantificables cuando sea posible
+- Si el contexto carece de información: "No tengo esa información específica disponible de inmediato"
+- Mantén un tono profesional pero accesible y auténtico
+- Si es apropiado, haz una pregunta inteligente de seguimiento sobre la empresa o el rol"""
+
+        # Instrucciones específicas por tipo (reutilizando las existentes)
+        type_instructions = {
+            QueryType.SKILLS: """
+SKILLS FOCUS - Be comprehensive and organized:
+- List specific technologies, programming languages, and tools
+- Mention proficiency levels and years of experience where available  
+- Organize by categories (programming, data analysis, business skills)
+- Include both technical and soft skills
+- Highlight unique combinations or specializations
+            """,
+            QueryType.EXPERIENCE: """
+EXPERIENCE FOCUS - Show your career journey:
+- Highlight specific roles, companies, and time periods
+- Emphasize key responsibilities and quantifiable achievements
+- Show career progression and growth trajectory
+- Include impact on business outcomes and team collaboration
+- Mention leadership examples and cross-functional work
+            """,
+            QueryType.EDUCATION: """
+EDUCATION FOCUS - Academic and continuous learning:
+- Include degrees, institutions, and graduation years
+- Mention relevant coursework and academic projects
+- Include certifications and continuous learning initiatives
+- Connect education to practical applications in your career
+            """,
+            QueryType.PROJECTS: """
+PROJECTS FOCUS - Technical accomplishments:
+- Describe specific projects with technologies and frameworks used
+- Explain your role and key contributions to each project
+- Highlight outcomes, impact, and lessons learned
+- Include technical challenges overcome and innovations implemented
+- Show problem-solving and technical leadership
+            """,
+            QueryType.SUMMARY: """
+SUMMARY FOCUS - Complete professional picture:
+- Provide comprehensive professional overview balancing technical and business
+- Highlight unique value proposition and career highlights
+- Show personality, passion, and future aspirations
+- Include key achievements that demonstrate impact
+- Connect technical skills to business outcomes
+            """,
+            QueryType.TECHNICAL: """
+TECHNICAL FOCUS - Deep technical expertise:
+- Detail specific technologies, frameworks, and programming languages
+- Explain technical implementations and architectural decisions
+- Include performance metrics and optimization achievements
+- Highlight problem-solving approaches and technical innovations
+- Show progression in technical complexity and leadership
+            """
+        }
+
+        type_instruction = type_instructions.get(query_type, "") if query_type else ""
+
+        # Agregar contexto conversacional si existe
+        conversation_context = ""
+        if conversation_session and len(conversation_session.messages) > 2:
+            conversation_context = f"\n\nNota: Esta es una conversación continua. Puedes hacer referencias naturales a temas que ya hemos discutido si es relevante para la respuesta."
+
+        # Format-specific adjustments
+        format_instruction = ""
+        if response_format == ResponseFormat.BULLET_POINTS:
+            format_instruction = "\nFormatea tu respuesta usando puntos claros para mejor legibilidad."
+        elif response_format == ResponseFormat.TECHNICAL:
+            format_instruction = "\nEnfócate en detalles técnicos, tecnologías específicas y enfoques de implementación."
+        elif response_format == ResponseFormat.SUMMARY:
+            format_instruction = "\nProvee un resumen conciso pero comprensivo."
+
+        return f"""{base_instructions}
+
+{type_instruction}
+
+{format_instruction}
+
+{conversation_context}
+
+Contexto de tu Currículum:
+{context}
+
+Pregunta actual: {question}
+
+Mi Respuesta:"""
+
+    # ===================================================================
+    # FUNCIONES ORIGINALES MANTENIDAS (CON ACTUALIZACIONES MENORES)
+    # ===================================================================
 
     def _calculate_ultimate_confidence(
         self, 
@@ -402,7 +721,7 @@ PERSONALIDAD PROFESIONAL:
         query_type: Optional[QueryType], 
         response_format: ResponseFormat
     ) -> str:
-        """Create specialized prompts based on query analysis"""
+        """Create specialized prompts based on query analysis (VERSIÓN ORIGINAL PARA COMPATIBILIDAD)"""
 
         base_instructions = """Eres Aldo Hernández Villanueva en una conversación profesional auténtica. Respondes como alguien que conoce perfectamente su carrera y experiencias.
 
@@ -572,8 +891,53 @@ Mi Respuesta:"""
 
         logger.info("✅ Cache warming completed")
 
+    # ===================================================================
+    # NUEVAS FUNCIONES UTILITARIAS CONVERSACIONALES
+    # ===================================================================
+
+    async def get_conversation_history(self, session_id: str) -> Dict[str, Any]:
+        """Obtiene el historial de una conversación específica"""
+        if session_id not in self.conversation_manager.sessions:
+            return {"error": "Session not found"}
+        
+        session = self.conversation_manager.sessions[session_id]
+        return {
+            "session_id": session.session_id,
+            "created_at": session.created_at.isoformat(),
+            "last_activity": session.last_activity.isoformat(),
+            "message_count": len(session.messages),
+            "messages": [
+                {
+                    "role": msg.role,
+                    "content": msg.content,
+                    "timestamp": msg.timestamp.isoformat(),
+                    "message_id": msg.message_id
+                }
+                for msg in session.messages
+            ]
+        }
+
+    async def clear_conversation(self, session_id: str) -> bool:
+        """Limpia una conversación específica"""
+        if session_id in self.conversation_manager.sessions:
+            del self.conversation_manager.sessions[session_id]
+            return True
+        return False
+
+    async def get_active_conversations(self) -> Dict[str, Any]:
+        """Obtiene estadísticas de conversaciones activas"""
+        active_sessions = len(self.conversation_manager.sessions)
+        total_messages = sum(len(session.messages) for session in self.conversation_manager.sessions.values())
+        
+        return {
+            "active_sessions": active_sessions,
+            "total_messages": total_messages,
+            "avg_messages_per_session": round(total_messages / max(active_sessions, 1), 2),
+            "conversation_enabled": self._conversation_enabled
+        }
+
     async def get_comprehensive_stats(self) -> Dict[str, Any]:
-        """Get comprehensive service statistics"""
+        """Get comprehensive service statistics including conversational metrics"""
         uptime = (datetime.utcnow() - self._startup_time).total_seconds()
 
         chromadb_stats = {}
@@ -583,29 +947,38 @@ Mi Respuesta:"""
             except Exception as e:
                 chromadb_stats = {"error": str(e)}
 
+        # Get conversational stats
+        conversation_stats = await self.get_active_conversations()
+
         return {
             "service_info": {
-                "name": "Ultimate CV Service",
+                "name": "Ultimate CV Service - Conversational Edition",
                 "version": self.settings.app_version,
                 "uptime_seconds": round(uptime, 2),
                 "environment": self.settings.environment,
-                "initialized": self._initialized
+                "initialized": self._initialized,
+                "conversational_enabled": self._conversation_enabled
             },
             "connection_manager": self.connection_manager.get_stats(),
             "cache_system": await self.cache_system.get_comprehensive_stats(),
             "chromadb_manager": chromadb_stats,
+            "conversation_manager": conversation_stats,
             "performance": {
                 "avg_query_time": "< 2 seconds",
                 "cache_hit_rate": "85%+",
-                "memory_efficiency": "Optimized"
+                "memory_efficiency": "Optimized",
+                "conversational_context": "Enhanced"
             }
         }
 
     async def cleanup(self):
-        """Comprehensive cleanup of all service components"""
+        """Comprehensive cleanup of all service components including conversations"""
         logger.info("🧹 Starting Ultimate CV Service cleanup...")
 
         try:
+            # Cleanup conversations
+            self.conversation_manager.sessions.clear()
+            
             # Cleanup in reverse order of initialization
             if self.chromadb_manager:
                 await self.chromadb_manager.cleanup()
@@ -617,6 +990,10 @@ Mi Respuesta:"""
 
         except Exception as e:
             logger.error(f"❌ Cleanup error: {e}")
+
+# ===================================================================
+# SINGLETON PATTERN ACTUALIZADO
+# ===================================================================
 
 # Singleton pattern for service instance
 _ultimate_cv_service_instance: Optional[UltimateCVService] = None
@@ -638,6 +1015,12 @@ async def get_ultimate_cv_service() -> UltimateCVService:
             _ultimate_cv_service_instance = service
 
     return _ultimate_cv_service_instance
+
+async def get_conversational_cv_service() -> UltimateCVService:
+    """Obtiene el servicio con capacidades conversacionales habilitadas (alias para claridad)"""
+    service = await get_ultimate_cv_service()
+    service._conversation_enabled = True
+    return service
 
 async def cleanup_ultimate_cv_service():
     """Cleanup Ultimate CV service singleton"""
