@@ -301,18 +301,14 @@ PROHIBITED INFORMATION TO INVENT:
     ) -> str:
         """Prompt simplificado - GPT maneja idiomas automáticamente"""
         
-        base_instructions = """Respond naturally in the same language as the question. Keep a normal conversational tone.
+        base_instructions = """Respond naturally in the same language as the question.
 
-STRICT RESPONSE RULES:
-- Base your answers ONLY on the context provided from your resume below
-- NEVER invent personal, family, or private life information
-- If context doesn't have necessary information, say: "I don't have that information available in my professional experience"
-- Be specific with technologies, companies, and dates ONLY if they're in the context
-- Use a natural tone, not like a salesperson or overly enthusiastic
-- DO NOT end with questions or offers for more information
-- Answer directly what you're asked, nothing more
-- Respond in the same language as the question
-- Keep responses to 2-3 sentences maximum"""
+RESPONSE RULES:
+- You can reference our previous conversation naturally when relevant
+- Use the resume context provided below for factual information about your background  
+- If someone asks follow-up questions like "which of those" or "tell me more about that", refer to what was previously discussed
+- NEVER invent personal information not in your resume
+- Keep responses to 2-4 sentences maximum"""
 
         # Type instructions simplificadas
         type_instructions = {
@@ -337,12 +333,12 @@ STRICT RESPONSE RULES:
 
 {conversation_context}
 
-COMPLETE Resume Context (USE ONLY THIS INFORMATION):
+COMPLETE Resume Context (Use only this and Previous Questions as information):
 {context}
 
 Question: {question}
 
-Natural professional response (2-3 sentences maximum, no additional questions, same language as question):"""
+Natural professional response (2-4 sentences maximum, no additional questions, same language as question):"""
 
     # ===================================================================
     # FUNCIÓN PRINCIPAL CONVERSACIONAL SIMPLIFICADA
