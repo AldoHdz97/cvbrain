@@ -1,9 +1,3 @@
-"""
-Ultimate CV Service Integration v3.0 - SIMPLIFIED EDITION
-Conversational capabilities with automatic language handling (GPT handles languages naturally)
-50% less code, same functionality, much easier to maintain
-"""
-
 import asyncio
 import logging
 import time
@@ -26,14 +20,9 @@ from app.utils.github_embeddings_downloader import GitHubEmbeddingsDownloader
 
 logger = logging.getLogger(__name__)
 
-# ===================================================================
-# CLASES PARA SISTEMA CONVERSACIONAL
-# ===================================================================
-
 @dataclass
 class ConversationMessage:
-    """Representa un mensaje en la conversación"""
-    role: str  # "user" o "assistant"
+    role: str
     content: str
     timestamp: datetime
     message_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -41,97 +30,112 @@ class ConversationMessage:
 
 @dataclass
 class ConversationSession:
-    """Maneja una sesión completa de conversación"""
     session_id: str
     messages: Deque[ConversationMessage] = field(default_factory=lambda: deque(maxlen=20))
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_activity: datetime = field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def add_message(self, role: str, content: str, metadata: Dict[str, Any] = None) -> ConversationMessage:
-        """Agrega un mensaje a la conversación"""
+        if not isinstance(content, str):
+            raise TypeError(f"Expected content to be string, got {type(content)}")
+
         message = ConversationMessage(
             role=role,
-            content=content,
+            content=content.strip(),
             timestamp=datetime.utcnow(),
             metadata=metadata or {}
         )
         self.messages.append(message)
         self.last_activity = datetime.utcnow()
         return message
-    
+
     def get_openai_messages(self, max_tokens: int = 4000) -> List[Dict[str, str]]:
-        """Convierte mensajes a formato OpenAI con gestión de tokens"""
         openai_messages = []
         current_tokens = 0
-        
-        # Estimar tokens (aproximadamente 4 caracteres = 1 token)
         for message in reversed(self.messages):
             estimated_tokens = len(message.content) // 4
             if current_tokens + estimated_tokens > max_tokens:
                 break
-            
             openai_messages.insert(0, {
                 "role": message.role,
                 "content": message.content
             })
             current_tokens += estimated_tokens
-        
         return openai_messages
-    
+
     def get_conversation_summary(self) -> str:
-        """Genera un resumen de la conversación para contexto"""
         if len(self.messages) <= 2:
             return ""
-        
         topics_discussed = []
         for msg in self.messages:
             if msg.role == "user" and len(msg.content) > 10:
-                # Extraer tema principal de la pregunta
                 topic = msg.content[:50] + "..." if len(msg.content) > 50 else msg.content
                 topics_discussed.append(topic)
-        
         if topics_discussed:
-            return f"Previously discussed topics: {', '.join(topics_discussed[-3:])}"  # Últimos 3 temas
+            return f"Previously discussed topics: {', '.join(topics_discussed[-3:])}"
         return ""
 
 class ConversationManager:
-    """Gestor principal de conversaciones"""
-    
     def __init__(self, max_sessions: int = 100):
         self.sessions: Dict[str, ConversationSession] = {}
         self.max_sessions = max_sessions
         self._cleanup_lock = asyncio.Lock()
-    
+
     async def get_or_create_session(self, session_id: str = None) -> ConversationSession:
-        """Obtiene una sesión existente o crea una nueva"""
         if session_id is None:
             session_id = str(uuid.uuid4())
-        
         if session_id not in self.sessions:
-            # Cleanup de sesiones viejas si es necesario
             await self._cleanup_old_sessions()
-            
             self.sessions[session_id] = ConversationSession(session_id=session_id)
-        
         return self.sessions[session_id]
-    
+
     async def _cleanup_old_sessions(self):
-        """Limpia sesiones inactivas"""
         async with self._cleanup_lock:
             if len(self.sessions) >= self.max_sessions:
-                # Ordenar por último uso y eliminar las más viejas
                 sorted_sessions = sorted(
                     self.sessions.items(),
                     key=lambda x: x[1].last_activity
                 )
-                
-                # Mantener solo las últimas max_sessions-10
                 sessions_to_keep = dict(sorted_sessions[-(self.max_sessions-10):])
                 self.sessions = sessions_to_keep
-                
                 logger.info(f"Cleaned up old conversation sessions. Active sessions: {len(self.sessions)}")
 
+class UltimateCVService:
+    def __init__(self):
+        self.settings = get_settings()
+        self._initialized = False
+        self.connection_manager = UltimateConnectionManager(
+            max_connections=self.settings.openai_max_connections,
+            max_connection_age=3600,
+            max_idle_time=300,
+            health_check_interval=60
+        )
+        self.cache_system = UltimateCacheSystem(
+            backend=CacheBackend(self.settings.cache_backend),
+            memory_config={
+                "max_size": self.settings.memory_cache_size,
+                "default_ttl": self.settings.memory_cache_ttl
+            },
+            redis_config={
+                "url": self.settings.redis_url,
+                "default_ttl": 3600,
+                "max_connections": self.settings.redis_max_connections,
+                "retry_on_timeout": self.settings.redis_retry_on_timeout
+            } if self.settings.redis_url else None
+        )
+        self.chromadb_manager = None
+        self.conversation_manager = ConversationManager(max_sessions=200)
+        self._conversation_enabled = True
+        self._startup_time = datetime.utcnow()
+        logger.info(f"Ultimate CV Service initialized with simplified conversational capabilities")
+
+    def verify_document_types(self, documents: List[Any]) -> List[str]:
+        issues = []
+        for i, doc in enumerate(documents):
+            if not isinstance(doc, str):
+                issues.append(f"Invalid type at index {i}: {type(doc)} → {repr(doc)[:100]}")
+        return issues
 # ===================================================================
 # CLASE PRINCIPAL SIMPLIFICADA
 # ===================================================================
