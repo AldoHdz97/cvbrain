@@ -469,7 +469,7 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 sources=[
                     doc[:150] + "..." if isinstance(doc, str) and len(doc) > 150 else doc
                     for doc in documents if isinstance(doc, str)
-                ]
+                ],
                 source_metadata=metadatas,
                 processing_metrics={
                     "total_time_seconds": round(processing_time, 4),
