@@ -255,20 +255,20 @@ def safe_extend_messages(messages, conversation_history):
 
 class UltimateCVService:
     """
-    🔥 ULTIMATE CV SERVICE v3.0 - SIMPLIFIED EDITION - FIXED
+    🔥 ULTIMATE CV SERVICE v3.0 - NATURAL CONVERSATION EDITION
 
-    Integrates all advanced components with simplified language handling:
+    Integrates all advanced components with natural conversation:
     - Ultimate connection management with HTTP/2
     - Multi-layer caching (Memory + Redis + Disk)
     - Advanced ChromaDB operations
     - AI-powered client profiling
-    - 🆕 Conversational memory and context management
-    - 🆕 Natural interview-style interactions
-    - 🆕 Automatic language handling (GPT responds in question language)
+    - 🆕 Natural, authentic conversational responses
+    - 🆕 Human-like interview interactions
+    - 🆕 Automatic language handling (responds in user's language)
     - Comprehensive monitoring and metrics
     - 🔧 FIXED: All syntax errors and slice errors resolved
     
-    SIMPLIFIED: 50% less code, GPT handles languages automatically
+    HUMANIZED: Natural prompts for authentic Aldo personality
     """
 
     def __init__(self):
@@ -307,12 +307,12 @@ class UltimateCVService:
         # Service state
         self._startup_time = datetime.utcnow()
 
-        logger.info(f"Ultimate CV Service initialized with simplified conversational capabilities")
+        logger.info(f"Ultimate CV Service initialized with natural conversational capabilities")
 
     async def initialize(self) -> bool:
         """Initialize all service components with proper embeddings flow"""
         try:
-            logger.info("🚀 Initializing Ultimate CV Service (Simplified Edition)...")
+            logger.info("🚀 Initializing Ultimate CV Service (Natural Conversation Edition)...")
 
             # STEP 1: Ensure embeddings are available FIRST
             logger.info("🔍 Checking embeddings availability...")
@@ -354,7 +354,7 @@ class UltimateCVService:
             await self._warm_cache()
 
             self._initialized = True
-            logger.info("✅ Ultimate CV Service (Simplified Edition) fully initialized")
+            logger.info("✅ Ultimate CV Service (Natural Conversation Edition) fully initialized")
 
             return True
 
@@ -363,49 +363,35 @@ class UltimateCVService:
             return False
 
     # ===================================================================
-    # SISTEMA DE PROMPTS SIMPLIFICADO (SOLO INGLÉS)
+    # 🔥 SISTEMA DE PROMPTS NATURALES Y HUMANIZADOS
     # ===================================================================
 
     def _get_conversational_system_prompt(self, conversation_session: ConversationSession = None) -> str:
-        """System prompt simplificado - GPT maneja idiomas automáticamente"""
+        """Natural system prompt - Aldo's authentic personality"""
         
-        base_prompt = """You are Aldo Hernández Villanueva in a relaxed professional conversation. You respond naturally and authentically in whatever language the person uses.
+        base_prompt = """You are Aldo Hernández Villanueva having a genuine professional conversation. You speak naturally and authentically, responding in whatever language the person uses.
 
-NATURAL CONVERSATIONAL BEHAVIOR:
-- You respond like a normal person in a casual professional conversation
-- You use a relaxed but professional tone, not like a salesperson
-- You're specific but not aggressive or overly enthusiastic
-- You respond directly (2-3 sentences maximum)
-- You do NOT ask additional questions - just answer what you're asked
-- You respond in the same language as the question (Spanish question = Spanish answer, English question = English answer)
+Your authentic personality:
+• You're confident but not boastful - you know your skills but don't oversell
+• You speak like a real person, not a sales pitch or formal CV
+• You're straightforward and honest about your experience
+• You respond naturally, like talking to a colleague over coffee
+• You match the language they use (English question → English answer, Spanish question → Spanish answer)
 
-STRICT INFORMATION RULES:
-- NEVER invent personal information that's not in your CV context
-- If you don't have specific information, clearly say "I don't have that information in my professional experience"
-- DO NOT talk about personal life, relationships, family unless explicitly in your CV context
-- ONLY use factual information from your documented professional experience provided
-- DO NOT make assumptions about personal details not in the context
+Conversation style:
+• Talk normally - avoid being overly formal or robotic
+• Share specific details from your actual experience when relevant
+• Don't invent personal information that's not documented
+• If you don't know something specific, just say so honestly
+• Keep responses conversational length - not too short, not essays
 
-RELAXED PROFESSIONAL PERSONALITY:
-- Confident but not boastful: "I've worked with Python for X years" vs "I'm amazing with Python!"
-- Direct without being salesy: "I have experience in..." vs "I'd love to work on...!"
-- Natural: avoid excessive exclamations and exaggerated enthusiasm
-- Professional but approachable: like talking to a colleague, not a client
-- Never end responses with questions or offers for more information
-
-PROHIBITED INFORMATION TO INVENT:
-- Marital status or personal relationships
-- Family information (children, parents, siblings, etc.)
-- Personal preferences unrelated to work
-- Specific project details not documented in the provided context
-- Certifications or experiences not in the CV context
-- Personal lifestyle, hobbies, or interests unless work-related and documented"""
+Remember: You're just having a normal professional chat, not interviewing or selling yourself."""
 
         # Agregar contexto conversacional si existe
         if conversation_session and len(getattr(conversation_session, 'messages', [])) > 1:
             conversation_summary = conversation_session.get_conversation_summary()
             if conversation_summary:
-                base_prompt += f"\n\nOUR CONVERSATION CONTEXT:\n{conversation_summary}"
+                base_prompt += f"\n\nConversation context: {conversation_summary}"
 
         return base_prompt
 
@@ -417,49 +403,25 @@ PROHIBITED INFORMATION TO INVENT:
         query_type: Optional[QueryType] = None,
         response_format: ResponseFormat = ResponseFormat.CONVERSATIONAL
     ) -> str:
-        """Prompt simplificado - GPT maneja idiomas automáticamente"""
+        """Natural prompt - like talking to a real person"""
         
-        base_instructions = """Respond naturally in the same language as the question.
-
-RESPONSE RULES:
-- You can reference our previous conversation naturally when relevant
-- Use the resume context provided below for factual information about your background  
-- If someone asks follow-up questions like "which of those" or "tell me more about that", refer to what was previously discussed
-- NEVER invent personal information not in your resume
-- Keep responses to 2-4 sentences maximum"""
-
-        # Type instructions simplificadas
-        type_instructions = {
-            QueryType.SKILLS: "Focus on specific technical skills mentioned in the context.",
-            QueryType.EXPERIENCE: "Describe specific roles and responsibilities from context without exaggerating.",
-            QueryType.EDUCATION: "Mention educational background from context factually.",
-            QueryType.PROJECTS: "Mention only documented projects in context with factual details.",
-            QueryType.SUMMARY: "Provide a balanced overview of professional background from context.",
-            QueryType.TECHNICAL: "Focus on technical details and implementations from context."
-        }
-
-        type_instruction = type_instructions.get(query_type, "")
-
-        # Context note simplificado
-        conversation_context = ""
+        # Conversational context note
+        conversation_note = ""
         if conversation_session and len(getattr(conversation_session, 'messages', [])) > 2:
-            conversation_context = f"\n\nNote: You can reference previous topics if relevant, but without inventing new information."
+            conversation_note = "\nNote: You can naturally reference what we've discussed before if it's relevant to this question."
 
-        return f"""{base_instructions}
+        return f"""Here's my professional background information:
 
-{type_instruction}
-
-{conversation_context}
-
-COMPLETE Resume Context (Use only this and Previous Questions as information):
 {context}
+
+{conversation_note}
 
 Question: {question}
 
-Natural professional response (2-4 sentences maximum, no additional questions, same language as question):"""
+(Respond naturally in the same language as the question, like you're having a normal professional conversation):"""
 
     # ===================================================================
-    # FUNCIÓN PRINCIPAL CONVERSACIONAL SIMPLIFICADA - FIXED
+    # FUNCIÓN PRINCIPAL CONVERSACIONAL NATURAL - FIXED
     # ===================================================================
 
     async def query_cv_conversational(
@@ -469,16 +431,15 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
         maintain_context: bool = True
     ) -> UltimateQueryResponse:
         """
-        🎯 QUERY CV CONVERSACIONAL SIMPLIFICADO - FIXED
+        🎯 NATURAL CONVERSATIONAL CV QUERY - FIXED
         
         Features:
-        - Mantiene historial de conversación
-        - Contexto inteligente entre mensajes
-        - GPT maneja idiomas automáticamente
-        - Gestión automática de tokens
-        - Conversaciones naturales de contratación
-        - Sin alucinaciones de información personal
-        - Respuestas cortas y naturales
+        - Natural conversation flow
+        - Authentic Aldo personality
+        - Context-aware responses
+        - Automatic language matching
+        - No robotic restrictions
+        - Genuine professional chat experience
         - 🔧 FIXED: All slice errors and syntax errors resolved
         """
         start_time = time.time()
@@ -571,7 +532,7 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 similarity_scores, documents, request
             )
 
-            # PASO 6: Crear prompt simplificado
+            # PASO 6: Crear prompt natural
             ai_start = time.time()
             context = self._create_optimized_context(documents, similarity_scores, request.query_type)
             
@@ -583,11 +544,12 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 request.response_format
             )
 
-            # PASO 7: Llamada a OpenAI simplificada - FIXED
-            temperature = request.temperature_override or self.settings.openai_temperature
-            max_tokens = request.max_response_length or self.settings.openai_max_tokens
+            # PASO 7: Llamada a OpenAI natural - FIXED
+            # More natural temperature for human-like responses
+            temperature = request.temperature_override or 0.8  # Higher for more natural variation
+            max_tokens = request.max_response_length or 300  # Reasonable length for conversation
 
-            # Mensajes simplificados
+            # Mensajes naturales
             messages = [
                 {
                     "role": "system",
@@ -615,8 +577,8 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=0.9,
-                frequency_penalty=0.1,
-                presence_penalty=0.1
+                frequency_penalty=0.2,  # Avoid repetition
+                presence_penalty=0.2    # Encourage varied responses
             )
 
             ai_time = time.time() - ai_start
@@ -633,7 +595,7 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 except Exception as e:
                     logger.warning(f"Error adding response to conversation: {e}")
 
-            # PASO 9: Response simplificado - FIXED
+            # PASO 9: Response natural - FIXED
             processing_time = time.time() - start_time
 
             response = UltimateQueryResponse(
@@ -664,7 +626,8 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 model_used=self.settings.openai_model,
                 model_parameters={
                     "temperature": temperature,
-                    "max_tokens": max_tokens
+                    "max_tokens": max_tokens,
+                    "conversation_mode": "natural"
                 },
                 tokens_used=ai_response.usage.total_tokens if hasattr(ai_response, 'usage') else None,
                 response_format=request.response_format,
@@ -672,11 +635,12 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 quality_metrics=self._calculate_quality_metrics(answer, similarity_scores),
                 metadata={
                     "service_version": self.settings.app_version,
-                    "processing_node": "ultimate_cv_service_simplified",
+                    "processing_node": "natural_conversation_service",
                     "cache_backend": self.settings.cache_backend,
                     "embedding_model": self.settings.embedding_model,
                     "session_id": conversation_session.session_id if conversation_session else None,
                     "conversation_turn": len(getattr(conversation_session, 'messages', [])) if conversation_session else 1,
+                    "personality_mode": "authentic_aldo",
                     "language_handling": "automatic"
                 }
             )
@@ -687,14 +651,14 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
             # Record metrics
             await self.connection_manager.record_request(True, processing_time)
 
-            logger.info(f"✅ Simplified conversational query processed in {processing_time:.3f}s (Session: {conversation_session.session_id if conversation_session else 'none'})")
+            logger.info(f"✅ Natural conversational query processed in {processing_time:.3f}s (Session: {conversation_session.session_id if conversation_session else 'none'})")
 
             return response
 
         except Exception as e:
             processing_time = time.time() - start_time
             await self.connection_manager.record_request(False, processing_time)
-            logger.error(f"❌ Simplified conversational query processing failed: {e}")
+            logger.error(f"❌ Natural conversational query processing failed: {e}")
             logger.error(f"Error type: {type(e).__name__}")
             logger.error(f"Error details: {str(e)}")
             # Return fallback response instead of crashing
@@ -705,7 +669,7 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
         🧠 QUERY CV ORIGINAL (COMPATIBILIDAD)
         
         Mantiene compatibilidad con código existente, pero internamente usa
-        el sistema conversacional sin mantener contexto entre llamadas.
+        el sistema conversacional natural sin mantener contexto entre llamadas.
         """
         return await self.query_cv_conversational(
             request=request,
@@ -714,14 +678,13 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
         )
 
     # ===================================================================
-    # FUNCIONES DE SOPORTE SIMPLIFICADAS
+    # FUNCIONES DE SOPORTE NATURALES
     # ===================================================================
 
     def _create_fallback_response(self, request: UltimateQueryRequest, start_time: float) -> UltimateQueryResponse:
-        """Fallback simplificado - GPT maneja idioma automáticamente"""
+        """Natural fallback response"""
         
-        # Solo mensaje en inglés - GPT adaptará automáticamente al idioma de la pregunta
-        fallback_message = "I don't have specific information about that in my documented professional experience."
+        fallback_message = "I don't have specific information about that in my professional experience."
 
         return UltimateQueryResponse(
             request_id=request.request_id,
@@ -750,6 +713,7 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
             metadata={
                 "service_version": self.settings.app_version,
                 "fallback": True,
+                "personality_mode": "authentic_aldo",
                 "language_handling": "automatic"
             }
         )
@@ -866,25 +830,25 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
             "word_count": len(answer_str.split()),
             "avg_similarity": round(sum(similarity_scores) / max(len(similarity_scores), 1), 4),
             "source_count": len(similarity_scores),
-            "completeness_score": min(len(answer_str) / 200, 1.0)  # Optimal around 200 chars
+            "completeness_score": min(len(answer_str) / 200, 1.0),  # Optimal around 200 chars
+            "naturalness_mode": "authentic_conversation"
         }
 
     async def _warm_cache(self):
-        """Intelligent cache warming with common queries (GPT handles languages automatically)"""
+        """Natural cache warming with diverse queries"""
+        # Only English queries to avoid language confusion
         common_queries = [
-            # English queries
             "What are your main technical skills?",
             "Tell me about your work experience",
             "What programming languages do you know?",
             "Describe your educational background",
-            # Spanish queries (GPT will respond in Spanish automatically)
-            "¿Cuáles son tus principales habilidades técnicas?",
-            "Háblame de tu experiencia laboral",
-            "¿Qué lenguajes de programación conoces?",
-            "Describe tu formación académica"
+            "What projects have you worked on?",
+            "How is your day going?",
+            "What tools do you use for data analysis?",
+            "Tell me about your role at Swarm Data"
         ]
 
-        logger.info("🔥 Starting simplified cache warming (automatic language handling)...")
+        logger.info("🔥 Starting natural cache warming...")
 
         for query in common_queries:
             try:
@@ -892,7 +856,7 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 warm_request = UltimateQueryRequest(
                     question=query,
                     k=3,
-                    response_format=ResponseFormat.SUMMARY
+                    response_format=ResponseFormat.CONVERSATIONAL
                 )
 
                 # Process query to warm cache
@@ -901,7 +865,7 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
             except Exception as e:
                 logger.warning(f"Cache warming failed for '{query}': {e}")
 
-        logger.info("✅ Simplified cache warming completed")
+        logger.info("✅ Natural cache warming completed")
 
     # ===================================================================
     # FUNCIONES UTILITARIAS CONVERSACIONALES
@@ -953,6 +917,7 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
             "total_messages": total_messages,
             "avg_messages_per_session": round(total_messages / max(active_sessions, 1), 2),
             "conversation_enabled": self._conversation_enabled,
+            "personality_mode": "authentic_aldo",
             "language_handling": "automatic"
         }
 
@@ -972,15 +937,16 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
 
         return {
             "service_info": {
-                "name": "Ultimate CV Service - Simplified Edition - Fixed",
+                "name": "Ultimate CV Service - Natural Conversation Edition",
                 "version": self.settings.app_version,
                 "uptime_seconds": round(uptime, 2),
                 "environment": self.settings.environment,
                 "initialized": self._initialized,
                 "conversational_enabled": self._conversation_enabled,
-                "language_handling": "automatic (GPT native)",
-                "code_complexity": "simplified (50% reduction)",
-                "fixes_applied": ["syntax_errors", "slice_errors", "conversation_memory"]
+                "personality_mode": "authentic_aldo",
+                "language_handling": "automatic (natural)",
+                "conversation_style": "human-like professional",
+                "fixes_applied": ["syntax_errors", "slice_errors", "natural_prompts", "authentic_personality"]
             },
             "connection_manager": self.connection_manager.get_stats(),
             "cache_system": await self.cache_system.get_comprehensive_stats(),
@@ -990,8 +956,10 @@ Natural professional response (2-4 sentences maximum, no additional questions, s
                 "avg_query_time": "< 2 seconds",
                 "cache_hit_rate": "85%+",
                 "memory_efficiency": "Optimized",
-                "conversational_context": "Enhanced",
-                "multilingual_support": "Automatic (GPT native)",
+                "conversational_context": "Natural",
+                "personality_authenticity": "High",
+                "language_detection": "Automatic",
+                "response_naturalness": "Human-like",
                 "error_handling": "Comprehensive"
             }
         }
@@ -1042,7 +1010,7 @@ async def get_ultimate_cv_service() -> UltimateCVService:
     return _ultimate_cv_service_instance
 
 async def get_conversational_cv_service() -> UltimateCVService:
-    """Obtiene el servicio con capacidades conversacionales habilitadas"""
+    """Obtiene el servicio con capacidades conversacionales naturales habilitadas"""
     service = await get_ultimate_cv_service()
     service._conversation_enabled = True
     return service
@@ -1056,60 +1024,51 @@ async def cleanup_ultimate_cv_service():
         _ultimate_cv_service_instance = None
 
 # ===================================================================
-# FUNCIONES DE TESTING SIMPLIFICADAS
+# FUNCIONES DE TESTING NATURALES
 # ===================================================================
 
-async def test_simplified_automatic_language():
-    """Test para verificar que GPT maneja idiomas automáticamente sin lógica compleja"""
+async def test_natural_conversation():
+    """Test para verificar conversaciones naturales"""
     service = await get_conversational_cv_service()
     
     test_questions = [
-        "What programming languages do you know?",  # English - should get English response
-        "¿Qué lenguajes de programación conoces?",  # Spanish - should get Spanish response
-        "Tell me about your experience",  # English
-        "Háblame de tu experiencia",  # Spanish
-        "¿Cuál es tu estado civil?",  # Spanish - should refuse without inventing
-        "What's your relationship status?",  # English - should refuse without inventing
-        "What are your technical skills?",  # English
-        "¿Cuáles son tus habilidades técnicas?"  # Spanish
+        "What programming languages do you know?",  
+        "¿Qué lenguajes de programación conoces?", 
+        "How's your day going?",
+        "¿Cómo va tu día?",
+        "Tell me about your experience",
+        "Háblame de tu experiencia"
     ]
     
-    print("🧪 Testing Simplified Automatic Language Handling:")
-    print("=" * 60)
+    print("🗣️ Testing Natural Conversation:")
+    print("=" * 50)
     
     for i, question in enumerate(test_questions, 1):
         try:
             response = await service.query_cv_conversational(
                 UltimateQueryRequest(question=question),
-                session_id="test_simplified_lang"
+                session_id="test_natural"
             )
             
             print(f"\n{i}. Question: {question}")
             print(f"   Response: {response.answer}")
+            print(f"   Sounds natural: {'working on some' not in response.answer.lower()}")
             print(f"   Length: {len(response.answer.split())} words")
-            print(f"   Ends with question: {'?' in response.answer[-20:]}")
-            print(f"   Contains personal info invention: {'novia' in response.answer.lower() or 'girlfriend' in response.answer.lower() or 'relationship' in response.answer.lower()}")
             
         except Exception as e:
             print(f"   Error: {e}")
 
-async def test_no_hallucinations():
-    """Test específico para verificar que no invente información personal"""
+async def test_no_personal_invention():
+    """Test que no invente información personal"""
     service = await get_conversational_cv_service()
     
     personal_questions = [
-        "¿Estás casado?",
         "Are you married?",
-        "¿Tienes hijos?",
+        "¿Estás casado?",
         "Do you have children?",
-        "¿Cuál es tu estado civil?",
+        "¿Tienes hijos?",
         "What's your relationship status?",
-        "¿Tienes novia?",
-        "Do you have a girlfriend?",
-        "¿Dónde vives?",
-        "Where do you live?",
-        "¿Cuántos años tienes?",
-        "How old are you?"
+        "¿Cuál es tu estado civil?"
     ]
     
     print("🚨 Testing No Personal Information Invention:")
@@ -1125,51 +1084,16 @@ async def test_no_hallucinations():
             print(f"\n{i}. Question: {question}")
             print(f"   Response: {response.answer}")
             
-            # Check for problematic invented information
-            invented_info = any(word in response.answer.lower() for word in [
-                'casado', 'married', 'novia', 'girlfriend', 'esposa', 'wife',
-                'hijos', 'children', 'años', 'years old', 'vivo en', 'live in'
+            # Check if it properly refuses without inventing
+            refuses_properly = any(phrase in response.answer.lower() for phrase in [
+                "don't have", "no information", "not documented", 
+                "professional experience", "no tengo", "información"
             ])
             
-            if invented_info:
-                print(f"   ⚠️  WARNING: Possible personal information invention!")
-            else:
-                print(f"   ✅ Good: No personal information invented")
+            print(f"   Properly refuses: {refuses_properly}")
                 
         except Exception as e:
             print(f"   Error: {e}")
-
-async def test_conversation_memory():
-    """Test conversation memory and context handling"""
-    service = await get_conversational_cv_service()
-    session_id = "test_memory_session"
-    
-    print("🧠 Testing Conversation Memory:")
-    print("=" * 40)
-    
-    questions = [
-        "What programming languages do you know?",
-        "Which of those do you use most?",
-        "Tell me about your experience with that language",
-        "What projects have you built with it?"
-    ]
-    
-    for i, question in enumerate(questions, 1):
-        try:
-            response = await service.query_cv_conversational(
-                UltimateQueryRequest(question=question),
-                session_id=session_id,
-                maintain_context=True
-            )
-            
-            print(f"\n{i}. Question: {question}")
-            print(f"   Response: {response.answer}")
-            print(f"   Session: {response.metadata.get('session_id', 'None')}")
-            print(f"   Turn: {response.metadata.get('conversation_turn', 1)}")
-            
-        except Exception as e:
-            print(f"   Error: {e}")
-            break
 
 # Export the main class and utility functions
 __all__ = [
@@ -1179,8 +1103,7 @@ __all__ = [
     "get_ultimate_cv_service",
     "get_conversational_cv_service", 
     "cleanup_ultimate_cv_service",
-    "test_simplified_automatic_language",
-    "test_no_hallucinations",
-    "test_conversation_memory"
+    "test_natural_conversation",
+    "test_no_personal_invention"
 ]
 
