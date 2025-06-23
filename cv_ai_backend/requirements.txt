@@ -17,6 +17,13 @@ chromadb==1.0.11                   # Stable production release with persistence
 httpx[http2]==0.28.0                      # Async HTTP client with HTTP/2 support
 
 # ============================================================================
+# Database & ORM (NEW - Interview Scheduling)
+# ============================================================================
+sqlalchemy[asyncio]==2.0.23        # Modern SQLAlchemy with async support
+aiosqlite==0.19.0                  # Async SQLite driver
+alembic==1.13.1                    # Database migrations
+
+# ============================================================================
 # Core Dependencies (Memory & Performance Optimized)
 # ============================================================================
 python-dotenv==1.0.1               # Environment management
