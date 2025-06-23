@@ -34,7 +34,7 @@ class DatabaseManager:
         if database_url is None:
             db_path = Path("data/interviews.db")
             db_path.parent.mkdir(parents=True, exist_ok=True)
-            database_url = f"sqlite+aiosqlite:///{db_path}"
+            database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/interviews.db")
         
         self.database_url = database_url
         self.engine = None
