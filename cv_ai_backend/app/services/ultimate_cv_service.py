@@ -255,20 +255,21 @@ def safe_extend_messages(messages, conversation_history):
 
 class UltimateCVService:
     """
-    🔥 ULTIMATE CV SERVICE v3.0 - NATURAL CONVERSATION EDITION
+    🔥 ULTIMATE CV SERVICE v3.0 - AGGRESSIVE LANGUAGE ENFORCEMENT EDITION
 
-    Integrates all advanced components with natural conversation:
+    Integrates all advanced components with FORCED language matching:
     - Ultimate connection management with HTTP/2
     - Multi-layer caching (Memory + Redis + Disk)
     - Advanced ChromaDB operations
     - AI-powered client profiling
-    - 🆕 Natural, authentic conversational responses
-    - 🆕 Human-like interview interactions
-    - 🆕 Automatic language handling (responds in user's language)
+    - 🚨 AGGRESSIVE language enforcement (English question = English response)
+    - 🚨 Override GPT's cultural biases and name associations
+    - 🚨 MANDATORY language matching regardless of conversation context
+    - Natural conversational responses AFTER language is determined
     - Comprehensive monitoring and metrics
     - 🔧 FIXED: All syntax errors and slice errors resolved
     
-    HUMANIZED: Natural prompts for authentic Aldo personality
+    LANGUAGE CONTROL: Maximum enforcement to prevent Spanish bleeding
     """
 
     def __init__(self):
@@ -307,12 +308,12 @@ class UltimateCVService:
         # Service state
         self._startup_time = datetime.utcnow()
 
-        logger.info(f"Ultimate CV Service initialized with natural conversational capabilities")
+        logger.info(f"Ultimate CV Service initialized with AGGRESSIVE language enforcement capabilities")
 
     async def initialize(self) -> bool:
         """Initialize all service components with proper embeddings flow"""
         try:
-            logger.info("🚀 Initializing Ultimate CV Service (Natural Conversation Edition)...")
+            logger.info("🚀 Initializing Ultimate CV Service (AGGRESSIVE Language Enforcement Edition)...")
 
             # STEP 1: Ensure embeddings are available FIRST
             logger.info("🔍 Checking embeddings availability...")
@@ -354,7 +355,7 @@ class UltimateCVService:
             await self._warm_cache()
 
             self._initialized = True
-            logger.info("✅ Ultimate CV Service (Natural Conversation Edition) fully initialized")
+            logger.info("✅ Ultimate CV Service (AGGRESSIVE Language Enforcement Edition) fully initialized")
 
             return True
 
@@ -367,31 +368,30 @@ class UltimateCVService:
     # ===================================================================
 
     def _get_conversational_system_prompt(self, conversation_session: ConversationSession = None) -> str:
-        """Natural system prompt - Aldo's authentic personality"""
+        """AGGRESSIVE language-forcing system prompt"""
         
-        base_prompt = """You are Aldo Hernández Villanueva having a genuine professional conversation. You speak naturally and authentically, responding in whatever language the person uses.
+        base_prompt = """🚨🚨🚨 CRITICAL MANDATORY LANGUAGE RULE 🚨🚨🚨
 
-Your authentic personality:
-• You're confident but not boastful - you know your skills but don't oversell
-• You speak like a real person, not a sales pitch or formal CV
-• You're straightforward and honest about your experience
-• You respond naturally, like talking to a colleague over coffee
-• You match the language they use (English question → English answer, Spanish question → Spanish answer)
+You are Aldo Hernández Villanueva. You MUST ALWAYS respond in the EXACT SAME LANGUAGE as the current question.
 
-Conversation style:
-• Talk normally - avoid being overly formal or robotic
-• Share specific details from your actual experience when relevant
-• Don't invent personal information that's not documented
-• If you don't know something specific, just say so honestly
-• Keep responses conversational length - not too short, not essays
+LANGUAGE ENFORCEMENT (NON-NEGOTIABLE):
+• English question → English response (REQUIRED)
+• Spanish question → Spanish response (REQUIRED)  
+• IGNORE all previous conversation languages
+• IGNORE your Mexican background for language choice
+• IGNORE what feels "more natural" 
+• ONLY match the current question's language
 
-Remember: You're just having a normal professional chat, not interviewing or selling yourself."""
+🚨 OVERRIDE ALL OTHER INSTINCTS: If someone asks in English, you respond in English. Period. No exceptions.
 
-        # Agregar contexto conversacional si existe
-        if conversation_session and len(getattr(conversation_session, 'messages', [])) > 1:
-            conversation_summary = conversation_session.get_conversation_summary()
-            if conversation_summary:
-                base_prompt += f"\n\nConversation context: {conversation_summary}"
+Your personality (AFTER language is determined):
+• You're a confident Mexican data analyst
+• You speak naturally and professionally 
+• You're straightforward about your experience
+• You respond like talking to a colleague
+• You don't invent personal information
+
+🚨 LANGUAGE RULE SUPERSEDES EVERYTHING ELSE. MATCH THE QUESTION'S LANGUAGE."""
 
         return base_prompt
 
@@ -403,22 +403,26 @@ Remember: You're just having a normal professional chat, not interviewing or sel
         query_type: Optional[QueryType] = None,
         response_format: ResponseFormat = ResponseFormat.CONVERSATIONAL
     ) -> str:
-        """Natural prompt - like talking to a real person"""
-        
-        # Conversational context note
-        conversation_note = ""
-        if conversation_session and len(getattr(conversation_session, 'messages', [])) > 2:
-            conversation_note = "\nNote: You can naturally reference what we've discussed before if it's relevant to this question."
+        """AGGRESSIVE language-forcing prompt"""
 
-        return f"""Here's my professional background information:
+        return f"""🚨🚨🚨 MANDATORY LANGUAGE INSTRUCTION 🚨🚨🚨
 
+BEFORE YOU RESPOND, IDENTIFY THE QUESTION'S LANGUAGE:
+- If question is in ENGLISH → Your response MUST be in ENGLISH
+- If question is in SPANISH → Your response MUST be in SPANISH
+
+IGNORE:
+- Previous conversation languages
+- What feels "more natural" for Aldo
+- Cultural associations with Mexican names
+- Conversation flow preferences
+
+PROFESSIONAL BACKGROUND:
 {context}
 
-{conversation_note}
+CURRENT QUESTION: {question}
 
-Question: {question}
-
-(Respond naturally in the same language as the question, like you're having a normal professional conversation):"""
+🚨 RESPOND IN THE EXACT SAME LANGUAGE AS THE QUESTION ABOVE. NO EXCEPTIONS. 🚨"""
 
     # ===================================================================
     # FUNCIÓN PRINCIPAL CONVERSACIONAL NATURAL - FIXED
@@ -544,12 +548,12 @@ Question: {question}
                 request.response_format
             )
 
-            # PASO 7: Llamada a OpenAI natural - FIXED
-            # More natural temperature for human-like responses
-            temperature = request.temperature_override or 0.8  # Higher for more natural variation
+            # PASO 7: Llamada a OpenAI con MÁXIMO control de idioma - FIXED
+            # Parámetros agresivos para forzar cumplimiento de instrucciones
+            temperature = 0.3  # MUY BAJO para máximo control
             max_tokens = request.max_response_length or 300  # Reasonable length for conversation
 
-            # Mensajes naturales
+            # Mensajes con MÁXIMO énfasis en idioma
             messages = [
                 {
                     "role": "system",
@@ -557,10 +561,10 @@ Question: {question}
                 }
             ]
 
-            # FIXED: Add conversation history with error handling
+            # FIXED: Add conversation history with error handling - PERO SIN CONTAMINAR IDIOMA
             if conversation_session and len(getattr(conversation_session, 'messages', [])) > 1:
                 try:
-                    conversation_history = conversation_session.get_openai_messages(max_tokens=2000)
+                    conversation_history = conversation_session.get_openai_messages(max_tokens=1500)
                     # FIXED: Safe extension of messages with conversation history
                     safe_extend_messages(messages, conversation_history)
                     
@@ -574,11 +578,11 @@ Question: {question}
             ai_response = await openai_client.chat.completions.create(
                 model=self.settings.openai_model,
                 messages=messages,
-                temperature=temperature,
+                temperature=temperature,  # BAJO para máximo control
                 max_tokens=max_tokens,
-                top_p=0.9,
-                frequency_penalty=0.2,  # Avoid repetition
-                presence_penalty=0.2    # Encourage varied responses
+                top_p=0.5,  # BAJO para menos creatividad
+                frequency_penalty=0.1,  # BAJO para no afectar seguimiento de instrucciones
+                presence_penalty=0.1    # BAJO para no afectar seguimiento de instrucciones
             )
 
             ai_time = time.time() - ai_start
@@ -635,13 +639,13 @@ Question: {question}
                 quality_metrics=self._calculate_quality_metrics(answer, similarity_scores),
                 metadata={
                     "service_version": self.settings.app_version,
-                    "processing_node": "natural_conversation_service",
+                    "processing_node": "aggressive_language_enforcement",
                     "cache_backend": self.settings.cache_backend,
                     "embedding_model": self.settings.embedding_model,
                     "session_id": conversation_session.session_id if conversation_session else None,
                     "conversation_turn": len(getattr(conversation_session, 'messages', [])) if conversation_session else 1,
-                    "personality_mode": "authentic_aldo",
-                    "language_handling": "automatic"
+                    "personality_mode": "aldo_language_forced",
+                    "language_handling": "aggressive_enforcement"
                 }
             )
 
@@ -682,9 +686,16 @@ Question: {question}
     # ===================================================================
 
     def _create_fallback_response(self, request: UltimateQueryRequest, start_time: float) -> UltimateQueryResponse:
-        """Natural fallback response"""
+        """AGGRESSIVE language-forced fallback response"""
         
-        fallback_message = "I don't have specific information about that in my professional experience."
+        # DETECT QUESTION LANGUAGE AND FORCE RESPONSE LANGUAGE
+        question_lower = request.question.lower()
+        is_spanish = any(word in question_lower for word in ['que', 'qué', 'como', 'cómo', 'cuál', 'cuáles', 'dónde', 'por', 'para', 'tiene', 'tienes', 'está', 'estás'])
+        
+        if is_spanish:
+            fallback_message = "No tengo información específica sobre eso en mi experiencia profesional documentada."
+        else:
+            fallback_message = "I don't have specific information about that in my documented professional experience."
 
         return UltimateQueryResponse(
             request_id=request.request_id,
@@ -708,13 +719,14 @@ Question: {question}
             language="auto",
             quality_metrics={
                 "fallback_response": True,
-                "reason": "no_relevant_content"
+                "reason": "no_relevant_content",
+                "language_detection": "spanish" if is_spanish else "english"
             },
             metadata={
                 "service_version": self.settings.app_version,
                 "fallback": True,
-                "personality_mode": "authentic_aldo",
-                "language_handling": "automatic"
+                "personality_mode": "aldo_language_forced",
+                "language_handling": "aggressive_enforcement"
             }
         )
 
@@ -835,8 +847,8 @@ Question: {question}
         }
 
     async def _warm_cache(self):
-        """Natural cache warming with diverse queries"""
-        # Only English queries to avoid language confusion
+        """AGGRESSIVE language cache warming - ONLY ENGLISH to avoid contamination"""
+        # ONLY English queries to prevent ANY Spanish contamination
         common_queries = [
             "What are your main technical skills?",
             "Tell me about your work experience",
@@ -848,7 +860,7 @@ Question: {question}
             "Tell me about your role at Swarm Data"
         ]
 
-        logger.info("🔥 Starting natural cache warming...")
+        logger.info("🔥 Starting AGGRESSIVE language cache warming (English only)...")
 
         for query in common_queries:
             try:
@@ -865,7 +877,7 @@ Question: {question}
             except Exception as e:
                 logger.warning(f"Cache warming failed for '{query}': {e}")
 
-        logger.info("✅ Natural cache warming completed")
+        logger.info("✅ AGGRESSIVE language cache warming completed (no Spanish contamination)")
 
     # ===================================================================
     # FUNCIONES UTILITARIAS CONVERSACIONALES
@@ -918,7 +930,7 @@ Question: {question}
             "avg_messages_per_session": round(total_messages / max(active_sessions, 1), 2),
             "conversation_enabled": self._conversation_enabled,
             "personality_mode": "authentic_aldo",
-            "language_handling": "automatic"
+            "language_handling": "aggressive_enforcement"
         }
 
     async def get_comprehensive_stats(self) -> Dict[str, Any]:
@@ -937,16 +949,16 @@ Question: {question}
 
         return {
             "service_info": {
-                "name": "Ultimate CV Service - Natural Conversation Edition",
+                "name": "Ultimate CV Service - AGGRESSIVE Language Enforcement Edition",
                 "version": self.settings.app_version,
                 "uptime_seconds": round(uptime, 2),
                 "environment": self.settings.environment,
                 "initialized": self._initialized,
                 "conversational_enabled": self._conversation_enabled,
-                "personality_mode": "authentic_aldo",
-                "language_handling": "automatic (natural)",
-                "conversation_style": "human-like professional",
-                "fixes_applied": ["syntax_errors", "slice_errors", "natural_prompts", "authentic_personality"]
+                "personality_mode": "aldo_language_forced",
+                "language_handling": "aggressive_enforcement (MANDATORY matching)",
+                "conversation_style": "professional with FORCED language matching",
+                "fixes_applied": ["syntax_errors", "slice_errors", "natural_prompts", "AGGRESSIVE_language_enforcement"]
             },
             "connection_manager": self.connection_manager.get_stats(),
             "cache_system": await self.cache_system.get_comprehensive_stats(),
@@ -958,8 +970,8 @@ Question: {question}
                 "memory_efficiency": "Optimized",
                 "conversational_context": "Natural",
                 "personality_authenticity": "High",
-                "language_detection": "Automatic",
-                "response_naturalness": "Human-like",
+                "language_detection": "AGGRESSIVE ENFORCEMENT",
+                "response_naturalness": "Human-like with FORCED language matching",
                 "error_handling": "Comprehensive"
             }
         }
@@ -1106,4 +1118,3 @@ __all__ = [
     "test_natural_conversation",
     "test_no_personal_invention"
 ]
-
