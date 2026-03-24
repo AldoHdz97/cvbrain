@@ -32,10 +32,8 @@ class GitHubEmbeddingsDownloader:
         self.filename = "embeddings.zip"  # ✅ CORREGIDO: Nuevo nombre
         
         # Build download URL
-        self.download_url = (
-            f"https://github.com/{self.github_user}/{self.github_repo}/"
-            f"releases/download/{self.release_version}/{self.filename}"
-        )
+        url = os.getenv("EMBEDDINGS_DOWNLOAD_URL", "https://github.com/AldoHdz97/cvbrain/releases/download/v1.0.0/embeddings.zip")
+        self.download_url = url
         
         logger.info(f"GitHub Embeddings Downloader initialized")
         logger.info(f"Download URL: {self.download_url}")

@@ -1,0 +1,9 @@
+.env
+*.db
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+chromadb/
+data/interviews.db
+*.sqlite
